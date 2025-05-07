@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Link, useRouter } from 'expo-router';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../utils/supabase';
 import Colors from '@/constants/Colors';
 
 const Login = () => {

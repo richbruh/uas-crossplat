@@ -22,24 +22,39 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) {
+  // Don't render anything until fonts are loaded and auth is checked
+  if ((!fontsLoaded && !fontError) || loading) {
     return null;
   }
 
   return (
     <>
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack>
         {!session ? (
+          // Auth stack - when user is not logged in
           <>
             <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="(auth)/Login" options={{ headerShown: false }} />
-            <Stack.Screen name="(auth)/Register" options={{ headerShown: false }} />
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           </>
         ) : (
+          // Main app stack - when user is logged in
           <>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="course/[id]" options={{ presentation: 'card' }} />
-            <Stack.Screen name="lesson/[id]" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen 
+              name="course/[id]" 
+              options={{ 
+                presentation: 'card',
+                headerShown: false 
+              }} 
+            />
+            <Stack.Screen 
+              name="lesson/[id]" 
+              options={{ 
+                presentation: 'fullScreenModal', 
+                animation: 'slide_from_bottom',
+                headerShown: false 
+              }} 
+            />
           </>
         )}
         <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
