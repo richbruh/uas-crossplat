@@ -6,9 +6,11 @@ import { X, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Video } from 'expo-av';
 import { useRef } from 'react';
 import { getLessonById, getCourseById, getLessonsByCourseId } from '@/data/courses';
-import Colors from '@/constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 export default function LessonScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const videoRef = useRef<Video>(null);
@@ -50,7 +52,7 @@ export default function LessonScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={closeLesson} style={styles.closeButton}>
-            <X size={24} color={Colors.textPrimary} />
+            <X size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>
             {course?.title}
@@ -130,7 +132,7 @@ export default function LessonScreen() {
             disabled={!prevLesson}
             onPress={() => prevLesson && navigateToLesson(prevLesson.id)}
           >
-            <ChevronLeft size={20} color={prevLesson ? Colors.primary : Colors.textTertiary} />
+            <ChevronLeft size={20} color={prevLesson ? colors.primary : colors.textTertiary} />
             <Text style={[styles.navButtonText, !prevLesson && styles.disabledButtonText]}>Previous</Text>
           </TouchableOpacity>
           
@@ -148,7 +150,7 @@ export default function LessonScreen() {
             onPress={() => nextLesson && navigateToLesson(nextLesson.id)}
           >
             <Text style={[styles.navButtonText, !nextLesson && styles.disabledButtonText]}>Next</Text>
-            <ChevronRight size={20} color={nextLesson ? Colors.primary : Colors.textTertiary} />
+            <ChevronRight size={20} color={nextLesson ? colors.primary : colors.textTertiary} />
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -156,10 +158,11 @@ export default function LessonScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   centerContainer: {
     flex: 1,
@@ -173,7 +176,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+    borderBottomColor: colors.borderLight,
   },
   closeButton: {
     width: 40,
@@ -185,7 +188,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 8,
@@ -215,13 +218,13 @@ const styles = StyleSheet.create({
   lessonTitle: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 24,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   lessonDuration: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   lessonContent: {
     marginBottom: 32,
@@ -229,26 +232,26 @@ const styles = StyleSheet.create({
   contentText: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     lineHeight: 24,
     marginBottom: 16,
   },
   quizContainer: {
     padding: 16,
-    backgroundColor: Colors.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 16,
     marginBottom: 32,
   },
   quizTitle: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 18,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   quizDescription: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 24,
     lineHeight: 24,
   },
@@ -258,32 +261,32 @@ const styles = StyleSheet.create({
   questionText: {
     fontFamily: 'Inter-Medium',
     fontSize: 16,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 16,
   },
   answerOption: {
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.borderLight,
+    borderColor: colors.borderLight,
     marginBottom: 12,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   selectedAnswer: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryLight + '20', // Add transparency
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight + '20',
   },
   answerText: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   selectedAnswerText: {
     fontFamily: 'Inter-Medium',
-    color: Colors.primary,
+    color: colors.primary,
   },
   submitButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -291,7 +294,7 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
-    color: Colors.background,
+    color: colors.background,
   },
   navigationContainer: {
     flexDirection: 'row',
@@ -299,8 +302,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-    backgroundColor: Colors.background,
+    borderTopColor: colors.borderLight,
+    backgroundColor: colors.background,
     paddingBottom: Platform.OS === 'ios' ? 32 : 16,
   },
   navButton: {
@@ -312,16 +315,16 @@ const styles = StyleSheet.create({
   navButtonText: {
     fontFamily: 'Inter-Medium',
     fontSize: 14,
-    color: Colors.primary,
+    color: colors.primary,
   },
   disabledButton: {
     opacity: 0.5,
   },
   disabledButtonText: {
-    color: Colors.textTertiary,
+    color: colors.textTertiary,
   },
   completeButton: {
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
@@ -329,12 +332,12 @@ const styles = StyleSheet.create({
   completeButtonText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 14,
-    color: Colors.background,
+    color: colors.background,
   },
   completedButton: {
-    backgroundColor: Colors.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
   },
   completedButtonText: {
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 });
