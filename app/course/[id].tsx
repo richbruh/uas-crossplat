@@ -1,15 +1,18 @@
 //course/[id].tsx
-import React from 'react';
-import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity, SafeAreaView } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, ScrollView, Image, Modal, Alert, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { ArrowLeft, Star, Clock, BookOpen, ChartBar as BarChart } from 'lucide-react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import * as Progress from 'react-native-progress';
 import LessonListItem from '@/components/LessonListItem';
 import { getCourseById, getLessonsByCourseId } from '@/data/courses';
-import Colors from '@/constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 export default function CourseDetailScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
+  const [showExamModal, setShowExamModal] = useState(false);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   
@@ -63,19 +66,19 @@ export default function CourseDetailScreen() {
               
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                  <Star size={16} color={Colors.warning} fill={Colors.warning} />
+                  <Star size={16} color={colors.warning} fill={colors.warning} />
                   <Text style={styles.statText}>{course.rating.toFixed(1)}</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <Clock size={16} color={Colors.textSecondary} />
+                  <Clock size={16} color={colors.textSecondary} />
                   <Text style={styles.statText}>{course.duration}</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <BookOpen size={16} color={Colors.textSecondary} />
+                  <BookOpen size={16} color={colors.textSecondary} />
                   <Text style={styles.statText}>{course.lessons} lessons</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <BarChart size={16} color={Colors.textSecondary} />
+                  <BarChart size={16} color={colors.textSecondary} />
                   <Text style={styles.statText}>{course.level}</Text>
                 </View>
               </View>
@@ -90,8 +93,8 @@ export default function CourseDetailScreen() {
                     progress={progressPercentage} 
                     width={null} 
                     height={8}
-                    color={Colors.primary}
-                    unfilledColor={Colors.backgroundTertiary}
+                    color={colors.primary}
+                    unfilledColor={colors.backgroundTertiary}
                     borderWidth={0}
                     borderRadius={4}
                   />
@@ -136,10 +139,11 @@ export default function CourseDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   centerContainer: {
     flex: 1,
@@ -172,7 +176,7 @@ const styles = StyleSheet.create({
     marginTop: -40,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
     paddingBottom: 100,
   },
   courseHeader: {
@@ -184,20 +188,20 @@ const styles = StyleSheet.create({
   category: {
     fontFamily: 'Inter-Medium',
     fontSize: 14,
-    color: Colors.primary,
+    color: colors.primary,
     marginBottom: 8,
   },
   title: {
     fontFamily: 'Inter-Bold',
     fontSize: 24,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
     lineHeight: 32,
   },
   instructor: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   statsRow: {
     flexDirection: 'row',
@@ -206,7 +210,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: Colors.borderLight,
+    borderColor: colors.borderLight,
   },
   statItem: {
     flexDirection: 'row',
@@ -215,7 +219,7 @@ const styles = StyleSheet.create({
   statText: {
     fontFamily: 'Inter-Medium',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginLeft: 6,
   },
   progressContainer: {
@@ -230,17 +234,17 @@ const styles = StyleSheet.create({
   progressTitle: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   progressPercentage: {
     fontFamily: 'Inter-Bold',
     fontSize: 16,
-    color: Colors.primary,
+    color: colors.primary,
   },
   progressText: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 8,
   },
   descriptionContainer: {
@@ -249,13 +253,13 @@ const styles = StyleSheet.create({
   descriptionTitle: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 18,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   description: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     lineHeight: 24,
   },
   tagsContainer: {
@@ -264,7 +268,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   tag: {
-    backgroundColor: Colors.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -274,7 +278,7 @@ const styles = StyleSheet.create({
   tagText: {
     fontFamily: 'Inter-Medium',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   lessonsContainer: {
     paddingHorizontal: 24,
@@ -282,7 +286,7 @@ const styles = StyleSheet.create({
   lessonsTitle: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 20,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 16,
   },
   enrollButtonContainer: {
@@ -291,13 +295,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 16,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
     borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
+    borderTopColor: colors.borderLight,
   },
   enrollButton: {
     height: 56,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
@@ -305,6 +309,64 @@ const styles = StyleSheet.create({
   enrollButtonText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
-    color: Colors.background,
+    color: colors.background,
   },
+  examButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+  },
+  examButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: colors.background,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: colors.background,
+    padding: 24,
+    borderRadius: 16,
+    width: '80%',
+    alignItems: 'center',
+  },
+  modalText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    color: colors.textPrimary,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButtonCancel: {
+    flex: 1,
+    backgroundColor: colors.backgroundSecondary,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginRight: 8,
+    alignItems: 'center',
+  },
+  modalButtonConfirm: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginLeft: 8,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    color: colors.background,
+    fontSize: 14,
+  },  
 });
