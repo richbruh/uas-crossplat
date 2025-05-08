@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { Play, FileText, CircleCheck as CheckCircle2, Clock } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { Lesson } from '@/types';
-import Colors from '@/constants/Colors';
+import { useTheme } from '../app/context/ThemeContext';
 
 interface LessonListItemProps {
   lesson: Lesson;
@@ -14,16 +14,19 @@ export default function LessonListItem({ lesson }: LessonListItemProps) {
     router.push(`/lesson/${lesson.id}`);
   };
 
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
+
   const getLessonIcon = () => {
     switch (lesson.type) {
       case 'video':
-        return <Play size={18} color={Colors.textSecondary} />;
+        return <Play size={18} color={colors.textSecondary} />;
       case 'reading':
-        return <FileText size={18} color={Colors.textSecondary} />;
+        return <FileText size={18} color={colors.textSecondary} />;
       case 'quiz':
-        return <CheckCircle2 size={18} color={Colors.textSecondary} />;
+        return <CheckCircle2 size={18} color={colors.textSecondary} />;
       default:
-        return <Play size={18} color={Colors.textSecondary} />;
+        return <Play size={18} color={colors.textSecondary} />;
     }
   };
 
@@ -38,7 +41,7 @@ export default function LessonListItem({ lesson }: LessonListItemProps) {
         <Text style={styles.title}>{lesson.title}</Text>
         <View style={styles.lessonDetails}>
           <View style={styles.durationContainer}>
-            <Clock size={14} color={Colors.textSecondary} />
+            <Clock size={14} color={colors.textSecondary} />
             <Text style={styles.duration}>{lesson.duration}</Text>
           </View>
           <Text style={[
@@ -53,19 +56,20 @@ export default function LessonListItem({ lesson }: LessonListItemProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
+  StyleSheet.create({
   container: {
     flexDirection: 'row',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-    backgroundColor: Colors.background,
+    borderBottomColor: colors.borderLight,
+    backgroundColor: colors.background,
   },
   iconContainer: {
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: Colors.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -76,7 +80,7 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: 'Inter-Medium',
     fontSize: 16,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   lessonDetails: {
@@ -91,7 +95,7 @@ const styles = StyleSheet.create({
   duration: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginLeft: 4,
   },
   status: {
@@ -99,9 +103,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   completedStatus: {
-    color: Colors.success,
+    color: colors.success,
   },
   pendingStatus: {
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 });
