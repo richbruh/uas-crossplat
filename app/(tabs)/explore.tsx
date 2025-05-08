@@ -6,11 +6,13 @@ import SearchBar from '@/components/SearchBar';
 import CategoryScroll from '@/components/CategoryScroll';
 import CoursesList from '@/components/CoursesList';
 import { mockCourses } from '@/data/courses';
-import Colors from '@/constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 const categories = ['All', 'Programming', 'Design', 'Business', 'Marketing', 'Data Science', 'Personal Development'];
 
 export default function ExploreScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   
@@ -58,10 +60,11 @@ export default function ExploreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   content: {
     flex: 1,
@@ -75,12 +78,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: 'Inter-Bold',
     fontSize: 28,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   resultsText: {
     fontFamily: 'Inter-Medium',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     paddingHorizontal: 16,
     marginTop: 16,
     marginBottom: 8,
