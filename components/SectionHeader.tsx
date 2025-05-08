@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
-import Colors from '@/constants/Colors';
+import { useTheme } from '../app/context/ThemeContext';
 
 interface SectionHeaderProps {
   title: string;
@@ -14,6 +14,8 @@ export default function SectionHeader({
   showSeeAll = false,
   onPressSeeAll,
 }: SectionHeaderProps) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
@@ -24,14 +26,15 @@ export default function SectionHeader({
           activeOpacity={0.7}
         >
           <Text style={styles.seeAllText}>See All</Text>
-          <ChevronRight size={16} color={Colors.primary} />
+          <ChevronRight size={16} color={colors.primary} />
         </TouchableOpacity>
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
+  StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -42,7 +45,7 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 20,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   seeAllButton: {
     flexDirection: 'row',
@@ -51,7 +54,7 @@ const styles = StyleSheet.create({
   seeAllText: {
     fontFamily: 'Inter-Medium',
     fontSize: 14,
-    color: Colors.primary,
+    color: colors.primary,
     marginRight: 4,
   },
 });
