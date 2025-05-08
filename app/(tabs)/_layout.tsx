@@ -3,9 +3,11 @@ import { Tabs } from 'expo-router';
 import { Platform, StyleSheet, View, ViewStyle } from 'react-native';
 import { Chrome as Home, BookOpen, Compass, User } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
-import Colors from '@/constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 export default function TabLayout() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const tabBarStyle: ViewStyle = Platform.OS === 'ios' ? {
     position: 'absolute',
     bottom: 0,
@@ -18,16 +20,16 @@ export default function TabLayout() {
     paddingBottom: 20,
   } : {
     height: 60,
-    backgroundColor: Colors.background,
-    borderTopColor: Colors.border,
+    backgroundColor: colors.background,
+    borderTopColor: colors.border,
   };
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textSecondary,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textSecondary,
         tabBarLabelStyle: styles.tabBarLabel,
         tabBarStyle: tabBarStyle,
         tabBarBackground: () => (
@@ -66,7 +68,8 @@ export default function TabLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
+  StyleSheet.create({
   tabBarLabel: {
     fontFamily: 'Inter-Medium',
     fontSize: 12,
