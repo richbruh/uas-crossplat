@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Star } from 'lucide-react-native';
 import * as Progress from 'react-native-progress';
 import { Course } from '@/types';
-import Colors from '@/constants/Colors';
+import { useTheme } from '../app/context/ThemeContext';
 
 interface CourseCardProps {
   course: Course;
@@ -15,6 +15,8 @@ export default function CourseCard({ course, variant = 'vertical' }: CourseCardP
   const navigateToCourse = () => {
     router.push(`/course/${course.id}`);
   };
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
 
   if (variant === 'horizontal') {
     return (
@@ -29,7 +31,7 @@ export default function CourseCard({ course, variant = 'vertical' }: CourseCardP
           <Text style={styles.title} numberOfLines={2}>{course.title}</Text>
           <View style={styles.details}>
             <View style={styles.ratingContainer}>
-              <Star size={14} color={Colors.warning} fill={Colors.warning} />
+              <Star size={14} color={colors.warning} fill={colors.warning} />
               <Text style={styles.rating}>{course.rating.toFixed(1)}</Text>
             </View>
             <Text style={styles.duration}>{course.duration}</Text>
@@ -40,8 +42,8 @@ export default function CourseCard({ course, variant = 'vertical' }: CourseCardP
                 progress={course.progress / 100} 
                 width={null} 
                 height={4}
-                color={Colors.primary}
-                unfilledColor={Colors.backgroundTertiary}
+                color={colors.primary}
+                unfilledColor={colors.backgroundTertiary}
                 borderWidth={0}
                 style={styles.progressBar}
               />
@@ -65,7 +67,7 @@ export default function CourseCard({ course, variant = 'vertical' }: CourseCardP
         <Text style={styles.title} numberOfLines={2}>{course.title}</Text>
         <View style={styles.details}>
           <View style={styles.ratingContainer}>
-            <Star size={14} color={Colors.warning} fill={Colors.warning} />
+            <Star size={14} color={colors.warning} fill={colors.warning} />
             <Text style={styles.rating}>{course.rating.toFixed(1)}</Text>
           </View>
           <Text style={styles.duration}>{course.duration}</Text>
@@ -76,8 +78,8 @@ export default function CourseCard({ course, variant = 'vertical' }: CourseCardP
               progress={course.progress / 100} 
               width={null} 
               height={4}
-              color={Colors.primary}
-              unfilledColor={Colors.backgroundTertiary}
+              color={colors.primary}
+              unfilledColor={colors.backgroundTertiary}
               borderWidth={0}
               style={styles.progressBar}
             />
@@ -89,9 +91,10 @@ export default function CourseCard({ course, variant = 'vertical' }: CourseCardP
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
+  StyleSheet.create({
   card: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     overflow: 'hidden',
     width: 280,
@@ -111,7 +114,7 @@ const styles = StyleSheet.create({
     }),
   },
   horizontalCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     overflow: 'hidden',
     flexDirection: 'row',
@@ -151,13 +154,13 @@ const styles = StyleSheet.create({
   category: {
     fontFamily: 'Inter-Medium',
     fontSize: 12,
-    color: Colors.primary,
+    color: colors.primary,
     marginBottom: 4,
   },
   title: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
     lineHeight: 22,
   },
@@ -173,13 +176,13 @@ const styles = StyleSheet.create({
   rating: {
     fontFamily: 'Inter-Medium',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginLeft: 4,
   },
   duration: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   progressContainer: {
     marginTop: 12,
@@ -190,6 +193,6 @@ const styles = StyleSheet.create({
   progressText: {
     fontFamily: 'Inter-Medium',
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   }
 });
