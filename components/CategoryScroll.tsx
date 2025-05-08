@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
-import Colors from '@/constants/Colors';
+import { useTheme } from '../app/context/ThemeContext';
 
 interface CategoryScrollProps {
   categories: string[];
@@ -13,6 +13,8 @@ export default function CategoryScroll({
   selectedCategory, 
   onSelectCategory 
 }: CategoryScrollProps) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   return (
     <ScrollView
       horizontal
@@ -43,7 +45,8 @@ export default function CategoryScroll({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
+  StyleSheet.create({
   container: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -53,17 +56,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 12,
-    backgroundColor: Colors.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
   },
   selectedCategoryButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   categoryText: {
     fontFamily: 'Inter-Medium',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   selectedCategoryText: {
-    color: Colors.background,
+    color: colors.background,
   },
 });
