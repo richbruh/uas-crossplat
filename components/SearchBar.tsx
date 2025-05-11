@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, TextInput, View, TouchableOpacity, Platform } from 'react-native';
 import { Search, X } from 'lucide-react-native';
-import Colors from '@/constants/Colors';
+import { useTheme } from '../app/context/ThemeContext';
 
 interface SearchBarProps {
   value: string;
@@ -16,20 +16,22 @@ export default function SearchBar({
   onClear,
   placeholder = 'Search for courses...',
 }: SearchBarProps) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   return (
     <View style={styles.container}>
       <View style={styles.searchContainer}>
-        <Search size={20} color={Colors.textSecondary} style={styles.searchIcon} />
+        <Search size={20} color={colors.textSecondary} style={styles.searchIcon} />
         <TextInput
           style={styles.input}
           placeholder={placeholder}
-          placeholderTextColor={Colors.textSecondary}
+          placeholderTextColor={colors.textSecondary}
           value={value}
           onChangeText={onChangeText}
         />
         {value.length > 0 && (
           <TouchableOpacity onPress={onClear} style={styles.clearButton}>
-            <X size={16} color={Colors.textSecondary} />
+            <X size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -37,7 +39,8 @@ export default function SearchBar({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
+  StyleSheet.create({
   container: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -45,7 +48,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 48,
@@ -71,7 +74,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: 'Inter-Regular',
     fontSize: 16,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     height: '100%',
     padding: 0,
   },

@@ -1,11 +1,13 @@
-//Pages/Login.tsx
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { supabase } from '../utils/supabase';
-import Colors from '@/constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 const Login = () => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,7 +43,7 @@ const Login = () => {
         <TextInput
           style={styles.input}
           placeholder="Enter your email"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -52,7 +54,7 @@ const Login = () => {
         <TextInput
           style={styles.input}
           placeholder="Enter your password"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -68,7 +70,7 @@ const Login = () => {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.background} />
           ) : (
             <Text style={styles.buttonText}>Login</Text>
           )}
@@ -87,84 +89,86 @@ const Login = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 24,
-    backgroundColor: Colors.background,
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-    marginBottom: 8,
-    fontFamily: 'Inter-Bold',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    marginBottom: 32,
-    fontFamily: 'Inter-Regular',
-  },
-  form: {
-    width: '100%',
-  },
-  label: {
-    fontSize: 14,
-    color: Colors.textPrimary,
-    marginBottom: 8,
-    fontFamily: 'Inter-Medium',
-  },
-  input: {
-    height: 50,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    backgroundColor: Colors.background,
-  },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginBottom: 24,
-  },
-  forgotPasswordText: {
-    color: Colors.primary,
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-  },
-  button: {
-    height: 50,
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  buttonText: {
-    color: Colors.background,
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  footerText: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    marginRight: 4,
-  },
-  footerLink: {
-    color: Colors.primary,
-    fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
-  },
-});
+const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: 24,
+      backgroundColor: colors.background,
+      justifyContent: 'center',
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+      marginBottom: 8,
+      fontFamily: 'Inter-Bold',
+    },
+    subtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginBottom: 32,
+      fontFamily: 'Inter-Regular',
+    },
+    form: {
+      width: '100%',
+    },
+    label: {
+      fontSize: 14,
+      color: colors.textPrimary,
+      marginBottom: 8,
+      fontFamily: 'Inter-Medium',
+    },
+    input: {
+      height: 50,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 16,
+      marginBottom: 16,
+      fontSize: 16,
+      fontFamily: 'Inter-Regular',
+      backgroundColor: colors.background,
+      color: colors.textPrimary,
+    },
+    forgotPassword: {
+      alignSelf: 'flex-end',
+      marginBottom: 24,
+    },
+    forgotPasswordText: {
+      color: colors.primary,
+      fontSize: 14,
+      fontFamily: 'Inter-Medium',
+    },
+    button: {
+      height: 50,
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    buttonText: {
+      color: colors.background,
+      fontSize: 16,
+      fontFamily: 'Inter-SemiBold',
+    },
+    footer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    footerText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+      marginRight: 4,
+    },
+    footerLink: {
+      color: colors.primary,
+      fontSize: 14,
+      fontFamily: 'Inter-SemiBold',
+    },
+  });
 
 export default Login;

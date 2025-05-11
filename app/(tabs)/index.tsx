@@ -7,11 +7,13 @@ import CategoryScroll from '@/components/CategoryScroll';
 import SectionHeader from '@/components/SectionHeader';
 import CoursesList from '@/components/CoursesList';
 import { getPopularCourses, getEnrolledCourses, getRecommendedCourses } from '@/data/courses';
-import Colors from '@/constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 const categories = ['All', 'Programming', 'Design', 'Business', 'Marketing', 'Data Science', 'Personal Development'];
 
 export default function HomeScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   
@@ -79,10 +81,10 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
+  StyleSheet.create({  container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   scrollContent: {
     paddingBottom: Platform.OS === 'ios' ? 100 : 80,
@@ -95,12 +97,12 @@ const styles = StyleSheet.create({
   greeting: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   headerTitle: {
     fontFamily: 'Inter-Bold',
     fontSize: 28,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 });

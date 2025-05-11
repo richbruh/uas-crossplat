@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Link, useRouter } from 'expo-router';
-import { supabase } from '../utils/supabase'; // Fixed path
-import Colors from '@/constants/Colors';
+import { supabase } from '../utils/supabase';
+import { useTheme } from '../context/ThemeContext';
 
 // Define the form data structure
 interface RegisterData {
@@ -22,6 +22,8 @@ interface ErrorState {
 }
 
 const Register = () => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -135,7 +137,7 @@ const Register = () => {
         <TextInput
           style={[styles.input, errors.fullName ? styles.inputError : null]}
           placeholder="Enter your full name"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           value={fullName}
           onChangeText={setFullName}
         />
@@ -145,7 +147,7 @@ const Register = () => {
         <TextInput
           style={[styles.input, errors.email ? styles.inputError : null]}
           placeholder="Enter your email"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -157,7 +159,7 @@ const Register = () => {
         <TextInput
           style={[styles.input, errors.password ? styles.inputError : null]}
           placeholder="Enter your password"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -168,7 +170,7 @@ const Register = () => {
         <TextInput
           style={[styles.input, errors.confirmPassword ? styles.inputError : null]}
           placeholder="Confirm your password"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
@@ -200,11 +202,12 @@ const Register = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: Colors.background
+    backgroundColor: colors.background
   },
   title: {
     fontSize: 28,
@@ -215,7 +218,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     fontFamily: 'Inter-Regular',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 8,
     marginBottom: 40
   },
@@ -229,7 +232,7 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   input: {
-    backgroundColor: Colors.background, // Fixed color reference
+    backgroundColor: colors.background, // Fixed color reference
     height: 50,
     borderRadius: 8,
     paddingHorizontal: 16,
@@ -252,7 +255,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular'
   },
   button: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     height: 50,
     borderRadius: 8,
     justifyContent: 'center',
@@ -270,11 +273,11 @@ const styles = StyleSheet.create({
     marginTop: 24
   },
   footerText: {
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontFamily: 'Inter-Regular'
   },
   footerLink: {
-    color: Colors.primary,
+    color: colors.primary,
     fontFamily: 'Inter-Medium',
     marginLeft: 6
   }
