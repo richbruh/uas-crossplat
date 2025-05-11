@@ -15,6 +15,7 @@ export default function RootLayout() {
     'Inter-SemiBold': Inter_600SemiBold,
     'Inter-Bold': Inter_700Bold,
   });
+  
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
