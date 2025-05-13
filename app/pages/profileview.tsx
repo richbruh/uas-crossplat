@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Image, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
-import { supabase } from 'lib/supabase'; // Adjust the import path as needed
+import { supabase } from '../utils/supabase'; // Adjust the import path as needed
 import { useAuth } from "context/AuthContext'; // Adjust the import path as needed
 import { format } from 'date-fns'; // You may need to install this package
 import { FontAwesome } from '@expo/vector-icons'; // You may need to install expo icons
