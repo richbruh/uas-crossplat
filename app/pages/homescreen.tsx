@@ -120,11 +120,7 @@ export default function HomeScreen() {
   );
 }
 // Defined ThemeColors interface (Apa itu Interface ? Interface adalah cara untuk mendefinisikan tipe data di TypeScript. 
-// Interface digunakan untuk mendefinisikan struktur objek, 
-// termasuk properti dan tipe data yang dimiliki oleh objek tersebut. 
-// Dalam konteks ini, interface ThemeColors 
-// digunakan untuk mendefinisikan struktur 
-// objek yang berisi warna-warna tema aplikasi.)
+
 interface ThemeColors {
   background: string;
   backgroundSecondary: string;
@@ -132,7 +128,6 @@ interface ThemeColors {
   textSecondary: string;
   primary: string;
 }
-// Colors perlu di infer type nya
 const getStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,

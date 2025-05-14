@@ -13,25 +13,43 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
+const handleLogin = async () => {
+  if (!email || !password) {
+    Alert.alert('Error', 'Please fill in all fields');
+    return;
+  }
 
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
+  setLoading(true);
+  try {
+    console.log('Attempting login with:', { email }); // Don't log passwords
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
-      Alert.alert('Login Error', error.message);
+      console.error('Login error details:', {
+        message: error.message,
+        status: error.status,
+        code: error.code,
+        name: error.name
+      });
+      
+      // More descriptive error message
+      let errorMessage = `${error.message}\nStatus: ${error.status || 'N/A'}\nCode: ${error.code || 'N/A'}`;
+      Alert.alert('Login Failed', errorMessage);
     } else {
+      console.log('Login successful');
       router.replace('/(tabs)');
     }
+  } catch (unexpectedError) {
+    console.error('Unexpected error during login:', unexpectedError);
+    Alert.alert('Login Error', 'An unexpected error occurred. Please try again later.');
+  } finally {
     setLoading(false);
-  };
+  }
+};
 
   return (
     <View style={styles.container}>
