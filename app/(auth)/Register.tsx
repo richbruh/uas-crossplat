@@ -38,8 +38,12 @@ const Register = () => {
     let isValid = true;
     const newErrors: ErrorState = {};
     
+    const trimmedEmail = email.trim();
+  
+
     // Validate email
-    if (!email || !/\S+@\S+\.\S+/.test(email)) {
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
+    if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
       newErrors.email = 'Please enter a valid email address';
       isValid = false;
     }
@@ -73,17 +77,28 @@ const Register = () => {
       
       // Step 1: Create authentication user
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: trimmedEmail,
         password,
         options: {
           data: {
-            full_name: fullName,
+            full_name: fullName.trim(),
+            role: 'student'
           },
         },
       });
       
       if (error) {
         console.error("Full signup error:", JSON.stringify(error));
+        
+        // Handle specific email error
+        if (error.code === 'email_address_invalid') {
+          setErrors({
+            email: 'This email address format is invalid or contains disallowed characters'
+          });
+          setLoading(false);
+          return;
+        }
+        
         Alert.alert('Registration Error', `${error.message} (${error.status || 'unknown status'})`);
         return;
       }
