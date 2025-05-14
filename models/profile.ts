@@ -1,5 +1,5 @@
-export interface Profile {
-  id: string;
+export interface profile {
+  user_id: string;
   full_name: string;
   avatar_url: string | null;
   role: string;
@@ -7,11 +7,11 @@ export interface Profile {
 }
 
 // Helper functions
-export function getDisplayName(profile: Profile): string {
+export function getDisplayName(profile: profile): string {
   return profile.full_name || 'Anonymous User';
 }
 
-export function getProfileImageUrl(profile: Profile): string {
+export function getProfileImageUrl(profile: profile): string {
   return profile.avatar_url || 'https://via.placeholder.com/120';
 }
 
