@@ -227,7 +227,7 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
   title: {
     fontSize: 28,
     fontFamily: 'Inter-Bold',
-    color: '#000', // Fixed color reference
+    color: colors.textPrimary, // Fixed color reference
     marginTop: 60
   },
   subtitle: {
@@ -243,7 +243,7 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
   label: {
     fontSize: 14,
     fontFamily: 'Inter-Medium',
-    color: '#000', // Fixed color reference
+    color: colors.textPrimary, // Fixed color reference
     marginBottom: 8
   },
   input: {
@@ -253,7 +253,7 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
     paddingHorizontal: 16,
     fontSize: 16,
     fontFamily: 'Inter-Regular',
-    color: '#000', // Fixed color reference
+    color: colors.textPrimary, // Fixed color reference
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E1E1E1'
