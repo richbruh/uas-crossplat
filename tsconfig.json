@@ -25,6 +25,6 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "nativewind-env.d.ts"
-  ],
+, "app/pages/homescreen.jsx", "app/pages/homescreen.jsx", "app/pages/profileview.jsx", "app/pages/profileview.jsx"  ],
   "extends": "expo/tsconfig.base"
 }

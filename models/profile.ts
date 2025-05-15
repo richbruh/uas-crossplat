@@ -2,7 +2,7 @@ export interface profile {
   user_id: string;
   full_name: string;
   avatar_url: string | null;
-  role: string;
+  role: 'admin' | 'teacher' | 'student';
   created_at: string;
 }
 
