@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, ScrollView, FlatList } from 'react-native';
-import { Course } from '@/types';
+import { Course } from '@/models/course';
 import CourseCard from './CourseCard';
 
 interface CoursesListProps {
