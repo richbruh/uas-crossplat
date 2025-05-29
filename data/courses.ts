@@ -1,4 +1,5 @@
 import { Course, Lesson } from '@/types';
+import { supabase } from '@/app/utils/supabase';
 
 export const mockCourses: Course[] = [
   {
@@ -84,6 +85,24 @@ export const mockCourses: Course[] = [
     tags: ['iOS', 'Swift', 'Mobile Development'],
   },
 ];
+
+export async function fetchCourses() {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*');
+  if (error) throw error;
+  return data as Course[];
+};
+
+// // Example: Fetch enrolled courses from Supabase (if you have an 'enrolled' field)
+// export const fetchEnrolledCoursesFromSupabase = async (): Promise<Course[]> => {
+//   const { data, error } = await supabase
+//     .from('courses')
+//     .select('*')
+//     .eq('enrolled', true);
+//   if (error) throw error;
+//   return data as Course[];
+// };
 
 export const mockLessons: Lesson[] = [
   // Course 1 - React Native

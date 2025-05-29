@@ -1,12 +1,11 @@
-//(tabs)/index.tsx
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, SafeAreaView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, SafeAreaView, Platform, ActivityIndicator } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import SearchBar from '@/components/SearchBar';
 import CategoryScroll from '@/components/CategoryScroll';
 import SectionHeader from '@/components/SectionHeader';
 import CoursesList from '@/components/CoursesList';
-import { getPopularCourses, getEnrolledCourses, getRecommendedCourses } from '@/data/courses';
+import { fetchCourses } from '@/data/courses';
 import { useTheme } from '../context/ThemeContext';
 
 const categories = ['All', 'Programming', 'Design', 'Business', 'Marketing', 'Data Science', 'Personal Development'];
@@ -16,14 +15,40 @@ export default function HomeScreen() {
   const styles = getStyles(colors);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  
-  const enrolledCourses = getEnrolledCourses();
-  const popularCourses = getPopularCourses();
-  const recommendedCourses = getRecommendedCourses();
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchCourses()
+      .then(setCourses)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Filter courses by search and category
+  const filteredCourses = courses.filter((course: any) => {
+    const matchCategory = selectedCategory === 'All' || course.category === selectedCategory;
+    const matchSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchCategory && matchSearch;
+  });
+
+  const enrolledCourses = filteredCourses.filter((c: any) => c.enrolled);
+  const popularCourses = [...filteredCourses].sort((a: any, b: any) => b.rating - a.rating).slice(0, 4);
+  const recommendedCourses = filteredCourses.slice(2, 6);
 
   const clearSearch = () => {
     setSearchQuery('');
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.textPrimary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -82,27 +107,28 @@ export default function HomeScreen() {
 }
 
 const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
-  StyleSheet.create({  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollContent: {
-    paddingBottom: Platform.OS === 'ios' ? 100 : 80,
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 16 : 48,
-    paddingBottom: 16,
-  },
-  greeting: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  headerTitle: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 28,
-    color: colors.textPrimary,
-  },
-});
+  StyleSheet.create({  
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      paddingBottom: Platform.OS === 'ios' ? 100 : 80,
+    },
+    header: {
+      paddingHorizontal: 16,
+      paddingTop: Platform.OS === 'ios' ? 16 : 48,
+      paddingBottom: 16,
+    },
+    greeting: {
+      fontFamily: 'Inter-Regular',
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginBottom: 4,
+    },
+    headerTitle: {
+      fontFamily: 'Inter-Bold',
+      fontSize: 28,
+      color: colors.textPrimary,
+    },
+  });
