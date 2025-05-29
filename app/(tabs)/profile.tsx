@@ -322,6 +322,7 @@ export default function ProfileScreen() {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      router.replace('/(auth)/Login');
     } catch (err: any) {
       console.error('Error signing out:', err);
       Alert.alert('Error', 'Failed to sign out. Please try again.');
