@@ -5,8 +5,10 @@ import SearchBar from '@/components/SearchBar';
 import CategoryScroll from '@/components/CategoryScroll';
 import SectionHeader from '@/components/SectionHeader';
 import CoursesList from '@/components/CoursesList';
+import { Course } from '@/models/course';
 import { fetchCourses } from '@/data/courses';
 import { useTheme } from '../context/ThemeContext';
+
 
 const categories = ['All', 'Programming', 'Design', 'Business', 'Marketing', 'Data Science', 'Personal Development'];
 
@@ -15,7 +17,7 @@ export default function HomeScreen() {
   const styles = getStyles(colors);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [courses, setCourses] = useState([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,7 +28,7 @@ export default function HomeScreen() {
   }, []);
 
   // Filter courses by search and category
-  const filteredCourses = courses.filter((course: any) => {
+  const filteredCourses = courses.filter((course: Course) => {
     const matchCategory = selectedCategory === 'All' || course.category === selectedCategory;
     const matchSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase());
     return matchCategory && matchSearch;
