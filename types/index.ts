@@ -4,5 +4,5 @@ export * from '@/models/enrollment';
 export * from '@/models/Exam';
 export * from '@/models/index';
 export * from '@/models/profile';
-export * from '@/models/submission';
-export * from '@/models/progress';
+export * from '@/models/Submission';
+export * from '@/models/Progress';

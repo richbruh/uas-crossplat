@@ -3,7 +3,6 @@ import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity, SafeAreaVi
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { ArrowLeft, BookOpen } from 'lucide-react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import * as Progress from 'react-native-progress';
 import LessonListItem from '@/components/LessonListItem';
 import { getCourseById, getLessonsByCourseId } from '@/data/courses';
 import { useTheme } from '../context/ThemeContext';

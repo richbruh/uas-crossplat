@@ -141,6 +141,22 @@ export const mockLessons: Lesson[] = [
   },
 ];
 
+// Tambahkan fungsi untuk insert data ke Supabase
+async function seedCoursesAndLessons() {
+  // Cek apakah data sudah ada agar tidak double insert
+  const { data: coursesData } = await supabase.from('courses').select('id');
+  if (!coursesData || coursesData.length === 0) {
+    await supabase.from('courses').insert(mockCourses);
+  }
+  const { data: lessonsData } = await supabase.from('lessons').select('id');
+  if (!lessonsData || lessonsData.length === 0) {
+    await supabase.from('lessons').insert(mockLessons);
+  }
+}
+
+// Jalankan seed saat file di-load
+seedCoursesAndLessons().catch(console.error);
+
 // export const getRecommendedCourses = (): Course[] => {
 //   return mockCourses.slice(2, 6);
 // };

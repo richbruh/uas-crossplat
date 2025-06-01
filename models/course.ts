@@ -10,6 +10,7 @@ export interface Course {
   teacher_id: string | null; // UUID reference to profiles.user_id
   total_lessons: number; // INTEGER default 0
   created_at: string; // TIMESTAMPTZ
+  // enrolled?: boolean; // Optional field to indicate if the user is enrolled in the course
 }
 
 export function getGradeLevelLabel(level: number): string {
