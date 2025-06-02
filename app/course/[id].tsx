@@ -1,38 +1,84 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { ArrowLeft, BookOpen } from 'lucide-react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import LessonListItem from '@/components/LessonListItem';
-import { getCourseById, getLessonsByCourseId } from '@/data/courses';
 import { useTheme } from '../context/ThemeContext';
+import { supabase } from '@/app/utils/supabase';
+import { Course, Lesson } from '@/models';
 
 export default function CourseDetailScreen() {
   const { colors } = useTheme();
   const styles = getStyles(colors);
   const [showExamModal, setShowExamModal] = useState(false);
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [course, setCourse] = useState<Course | null>(null);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  
-  const course = getCourseById(id);
-  const lessons = getLessonsByCourseId(id);
+
   const imageUri = course?.thumbnail_url;
-  
-  if (!course) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text>Course not found</Text>
-      </View>
-    );
-  }
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // Fetch course
+        const { data: courseData, error: courseError } = await supabase
+          .from('courses')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (courseError) throw courseError;
+        setCourse(courseData);
+
+        // Fetch lessons
+        const { data: lessonsData, error: lessonsError } = await supabase
+          .from('lessons')
+          .select('*')
+          .eq('course_id', id)
+          .order('lesson_order', { ascending: true });
+        if (lessonsError) throw lessonsError;
+        setLessons(lessonsData || []);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load course');
+        setCourse(null);
+        setLessons([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (id) fetchData();
+  }, [id]);
 
   const goBack = () => {
     router.back();
   };
-  
-  // Calculate progress (jika lesson ada properti completed, jika tidak hapus baris ini)
-  // const completedLessons = lessons.filter(lesson => lesson.completed).length;
-  // const progressPercentage = lessons.length > 0 ? (completedLessons / lessons.length) : 0;
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 16, color: colors.textSecondary }}>Loading...</Text>
+      </View>
+    );
+  }
+
+  if (error || !course) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={{ color: colors.error, fontSize: 18, marginBottom: 8 }}>
+          {error ? error : 'Course not found'}
+        </Text>
+        <TouchableOpacity onPress={goBack} style={styles.backButton}>
+          <Text style={{ color: colors.primary }}>Kembali</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <>
@@ -80,9 +126,13 @@ export default function CourseDetailScreen() {
             
             <View style={styles.lessonsContainer}>
               <Text style={styles.lessonsTitle}>Course Content</Text>
-              {lessons.map((lesson) => (
-                <LessonListItem key={lesson.id} lesson={lesson} />
-              ))}
+              {lessons.length === 0 ? (
+                <Text style={{ color: colors.textSecondary }}>Belum ada lesson.</Text>
+              ) : (
+                lessons.map((lesson) => (
+                  <LessonListItem key={lesson.id} lesson={lesson} />
+                ))
+              )}
             </View>
           </Animated.View>
         </SafeAreaView>
@@ -103,12 +153,14 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
     alignItems: 'center',
   },
   backButton: {
-    width: 36,
+    width: 100,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 12,
+    paddingHorizontal: 16,
   },
   coverImage: {
     width: '100%',

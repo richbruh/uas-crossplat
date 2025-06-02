@@ -41,7 +41,7 @@ interface FormErrors {
   thumbnail_url?: string;
 }
 
-const GRADE_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; // Lebih lengkap
+const GRADE_LEVELS = [1, 2, 3, 4, 5, 6]; // Lebih lengkap
 
 export default function MakeCourseForm({
   initialCourseData,
