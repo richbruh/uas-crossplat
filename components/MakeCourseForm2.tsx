@@ -105,11 +105,15 @@ export default function MakeCourseForm({ course, onSuccess, onCancel }: MakeCour
           }
         }
       } catch (error) {
-        console.error('[ERROR] fetchTeachers:', {
-          message: error.message,
-          code: error.code,
-          details: error.details
-        });
+        if (typeof error === 'object' && error !== null) {
+          console.error('[ERROR] fetchTeachers:', {
+            message: (error as any).message,
+            code: (error as any).code,
+            details: (error as any).details
+          });
+        } else {
+          console.error('[ERROR] fetchTeachers:', error);
+        }
         Alert.alert('Error', 'Failed to load teachers list');
       } finally {
         setFetchingTeachers(false);
@@ -210,9 +214,10 @@ export default function MakeCourseForm({ course, onSuccess, onCancel }: MakeCour
         console.log('[IMAGE] Image selection canceled');
       }
     } catch (error) {
+      const err = error as any;
       console.error('[ERROR] handleImageUpload:', {
-        message: error.message,
-        stack: error.stack
+        message: err?.message,
+        stack: err?.stack
       });
       Alert.alert('Error', 'Failed to upload image');
     } finally {
@@ -295,13 +300,21 @@ export default function MakeCourseForm({ course, onSuccess, onCancel }: MakeCour
 
       onSuccess();
     } catch (error) {
+      let message = 'Failed to save course';
+      let code, details, stack;
+      if (typeof error === 'object' && error !== null) {
+        message = (error as any).message || message;
+        code = (error as any).code;
+        details = (error as any).details;
+        stack = (error as any).stack;
+      }
       console.error('[ERROR] handleSubmit:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        stack: error.stack
+        message,
+        code,
+        details,
+        stack
       });
-      Alert.alert('Error', error.message || 'Failed to save course');
+      Alert.alert('Error', message);
     } finally {
       setLoading(false);
     }
