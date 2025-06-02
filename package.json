@@ -27,6 +27,7 @@
     "expo-camera": "~16.1.6",
     "expo-constants": "~17.1.6",
     "expo-font": "^13.0.3",
+<<<<<<< HEAD
     "expo-haptics": "~14.1.4",
     "expo-image-picker": "~16.1.4",
     "expo-linear-gradient": "~14.1.4",
@@ -37,6 +38,19 @@
     "expo-symbols": "~0.4.4",
     "expo-system-ui": "~5.0.7",
     "expo-web-browser": "~14.1.6",
+=======
+    "expo-haptics": "^14.0.1",
+    "expo-image-picker": "^16.1.4",
+    "expo-linear-gradient": "^14.0.2",
+    "expo-linking": "^7.0.5",
+    "expo-module-scripts": "^4.1.7",
+    "expo-router": "4.0.17",
+    "expo-splash-screen": "^0.29.21",
+    "expo-status-bar": "^2.0.1",
+    "expo-symbols": "^0.2.2",
+    "expo-system-ui": "^4.0.7",
+    "expo-web-browser": "^14.0.2",
+>>>>>>> webe
     "lucide-react-native": "^0.475.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",

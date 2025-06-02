@@ -32,19 +32,21 @@ export default function ExploreScreen() {
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   const filteredCourses = mockCourses.filter(course => {
-    const matchesSearch =
-      searchQuery === '' ||
-      course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.tags.some(tag =>
-        tag.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+  const lowerSearch = searchQuery.toLowerCase();
+  const matchesSearch =
+    lowerSearch === '' ||
+    (course.title?.toLowerCase().includes(lowerSearch)) ||
+    (course.description?.toLowerCase().includes(lowerSearch));
+    // (course.tags?.some((tag: string) =>
+    //   tag?.toLowerCase().includes(lowerSearch)
+    // ));
 
-    const matchesCategory =
-      selectedCategory === 'All' || course.category === selectedCategory;
+  const matchesCategory =
+    selectedCategory === 'All';
+    // course.category?.toLowerCase() === selectedCategory.toLowerCase();
 
-    return matchesSearch && matchesCategory;
-  });
+  return matchesSearch && matchesCategory;
+});
 
   const clearSearch = () => {
     setSearchQuery('');
@@ -63,7 +65,6 @@ export default function ExploreScreen() {
         placeholder="Search by title, description, or tags..."
       />
 
-      {/* Inline & restyled CategoryScroll */}
       <CategoryScroll
         categories={categories}
         selectedCategory={selectedCategory}
@@ -96,20 +97,28 @@ function CategoryScroll({
   return (
     <View style={styles.container}>
       {categories.map(category => {
-        const isSelected = category === selectedCategory;
+        const isSelected =
+          category.toLowerCase() === selectedCategory.toLowerCase();
         return (
           <TouchableOpacity
             key={category}
             onPress={() => onSelectCategory(category)}
             style={[
               styles.button,
-              { backgroundColor: isSelected ? colors.primary : colors.card },
+              {
+                backgroundColor: isSelected ? colors.primary : colors.card,
+                borderWidth: isSelected ? 2 : 0,
+                borderColor: isSelected ? colors.textPrimary : 'transparent',
+              },
             ]}
           >
             <Text
               style={[
                 styles.text,
-                { color: isSelected ? colors.textPrimary : colors.textPrimary },
+                {
+                  color: isSelected ? colors.background : colors.textPrimary,
+                  fontWeight: isSelected ? 'bold' : 'normal',
+                },
               ]}
             >
               {category}
@@ -158,9 +167,7 @@ const categoryStyles = (colors: typeof import('@/constants/Colors').default.ligh
       flexWrap: 'wrap',
       paddingHorizontal: 16,
       marginTop: 12,
-      // horizontal spacing
       columnGap: 12,
-      // vertical spacing between rows
       rowGap: 12,
     },
     button: {
