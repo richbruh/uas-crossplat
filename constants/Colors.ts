@@ -29,6 +29,8 @@ const Colors = {
     borderLight: '#E5E5EA',
     card: '#FFFFFF',
     overlay: 'rgba(0, 0, 0, 0.5)',
+    info: '#007bff'
+
   },
   dark: {
     primary: '#3396FF',
@@ -59,6 +61,7 @@ const Colors = {
     borderLight: '#2C2C2E',
     card: '#1C1C1E',
     overlay: 'rgba(255, 255, 255, 0.2)',
+    info: '#17a2b8'
   },
 };
 
