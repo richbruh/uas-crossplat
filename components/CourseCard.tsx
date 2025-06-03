@@ -1,3 +1,4 @@
+// ./components/CourseCard.tsx
 import React from 'react';
 import { StyleSheet, Text, View, Image, TouchableOpacity, Platform } from 'react-native';
 import { router } from 'expo-router';
