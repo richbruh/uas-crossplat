@@ -7,19 +7,28 @@ import LessonListItem from '@/components/LessonListItem';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '@/app/utils/supabase';
 import { Course, Lesson } from '@/models';
+import { profile } from '@/models/profile'; // Assuming you have a Profile model
 
+
+interface CourseWithTeacher extends Course {
+  profiles?: {
+    full_name?: string;
+  };
+}
 export default function CourseDetailScreen() {
   const { colors } = useTheme();
   const styles = getStyles(colors);
   const [showExamModal, setShowExamModal] = useState(false);
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [course, setCourse] = useState<Course | null>(null);
+
+  const [course, setCourse] = useState<CourseWithTeacher | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
+  const router = useRouter();
   const imageUri = course?.thumbnail_url;
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -29,9 +38,10 @@ export default function CourseDetailScreen() {
         // Fetch course
         const { data: courseData, error: courseError } = await supabase
           .from('courses')
-          .select('*')
+          .select(`*, profiles!teacher_id(full_name)`)
           .eq('id', id)
           .single();
+
         if (courseError) throw courseError;
         setCourse(courseData);
 
@@ -105,7 +115,9 @@ export default function CourseDetailScreen() {
             <View style={styles.courseHeader}>
               <View style={styles.courseInfo}>
                 <Text style={styles.title}>{course.title}</Text>
-                <Text style={styles.instructor}>By {course.teacher_id}</Text>
+                <Text style={styles.instructor}>
+                  By {course.profiles?.full_name || 'Unknown Teacher'}
+                </Text>           
               </View>
               
               <View style={styles.statsRow}>
