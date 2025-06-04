@@ -47,61 +47,75 @@ export default function MyLearningScreen() {
   }, [session]);
 
 
-  // Data Fetching
-  const fetchEnrolledCourses = async () => {
-    // Skip fetch if user isn't logged in
-    if (!session?.user) {
-      setLoading(false);
-      return;
-    }
+// Data Fetching
+const fetchEnrolledCourses = async () => {
+  // Skip fetch if user isn't logged in
+  if (!session?.user) {
+    console.log('❌ No user session found, skipping fetch');
+    setLoading(false);
+    return;
+  }
 
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Fetch enrolled courses from Supabase by joining enrollments with courses
-      const { data, error } = await supabase
-        .from('enrollments')
-        .select(`
-          progress_percentage,
-          courses:course_id(
-            id, 
-            title, 
-            description, 
-            thumbnail_url, 
-            grade_level,
-            total_lessons,
-            created_at,
-            teacher_id
-          )
-        `)
-        .eq('student_id', session.user.id);
+  try {
+    setLoading(true);
+    setError(null);
+    
+    console.log('🔍 Fetching enrollments for user:', session.user.id);
+    
+    // Option 1: Use explicit foreign key reference
+    const { data, error } = await supabase
+      .from('enrollments')
+      .select(`
+        id,
+        progress_percentage,
+        enrolled_at,
+        completed_lessons,
+        courses!enrollments_course_id_fkey (
+          id, 
+          title, 
+          description, 
+          thumbnail_url, 
+          grade_level,
+          total_lessons,
+          created_at,
+          teacher_id
+        )
+      `)
+      .eq('student_id', session.user.id);
 
-      if (error) throw error;
-      
-      // Transform the joined data to match EnrolledCourse interface
-      const courses: EnrolledCourse[] = data
-        .filter((item: any) => item.courses) // Filter out any null courses
-        .map((item: any) => ({
-          id: item.courses.id,
-          title: item.courses.title,
-          grade_level: item.courses.grade_level,
-          description: item.courses.description,
-          thumbnail_url: item.courses.thumbnail_url,
-          teacher_id: item.courses.teacher_id,
-          total_lessons: item.courses.total_lessons,
-          created_at: item.courses.created_at,
-          progress: item.progress_percentage
-        }));
-      
-      setEnrolledCourses(courses);
-    } catch (err: any) {
-      console.error('Error fetching enrolled courses:', err.message);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    console.log('📊 Enrollments query result:', { data, error });
+
+    if (error) {
+      console.error('❌ Supabase error:', error);
+      throw error;
     }
-  };
+    
+    // Transform the joined data to match EnrolledCourse interface
+    const courses: EnrolledCourse[] = (data || [])
+      .filter((item: any) => item.courses) // Filter out any null courses
+      .map((item: any) => ({
+        id: item.courses.id,
+        title: item.courses.title,
+        grade_level: item.courses.grade_level,
+        description: item.courses.description,
+        thumbnail_url: item.courses.thumbnail_url,
+        teacher_id: item.courses.teacher_id,
+        total_lessons: item.courses.total_lessons || 0,
+        created_at: item.courses.created_at,
+        progress: item.progress_percentage || 0
+      }));
+      
+    console.log('✅ Processed courses count:', courses.length);
+    console.log('✅ Processed courses:', courses);
+
+    setEnrolledCourses(courses);
+  } catch (err: any) {
+    console.error('💥 Error fetching enrolled courses:', err);
+    setError(err.message || 'Failed to load courses');
+  } finally {
+    setLoading(false);
+  }
+};
 
 
 // Helper functions
