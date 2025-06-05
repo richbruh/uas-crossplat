@@ -20,7 +20,7 @@ export default function CourseDetailScreen() {
   const { session } = useAuth();
 
   // Add Debug Logs
-    console.log('🔍 Debug Auth:', {
+  console.log('🔍 Debug Auth:', {
     session: session,
     user: session?.user,
     hasUser: !!session?.user,
