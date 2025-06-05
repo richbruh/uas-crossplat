@@ -1,13 +1,21 @@
 {
   "expo": {
-    "name": "bolt-expo-nativewind",
+    "name": "E-learning App",
     "slug": "bolt-expo-nativewind",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    
+    "newArchEnabled": false,
+    
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "NEVER",
+      "fallbackToCacheTimeout": 0
+    },
+    
     "ios": {
       "supportsTablet": true
     },
@@ -23,7 +31,11 @@
       "typedRoutes": true
     },
     "android": {
-      "package": "com.richie_zakaria.boltexponativewind"
+      "package": "com.richie_zakaria.boltexponativewind",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/e_learning.png",
+        "backgroundColor": "#ffffff"
+      }
     }
   }
 }
