@@ -1,3 +1,4 @@
+// ./(auth)/Login.tsx
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Link, useRouter } from 'expo-router';
@@ -13,39 +14,74 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // In your Login.tsx
 const handleLogin = async () => {
-  if (!email || !password) {
-    Alert.alert('Error', 'Please fill in all fields');
-    return;
-  }
-
-  setLoading(true);
   try {
-    console.log('Attempting login with:', { email }); // Don't log passwords
+    setLoading(true);
+    console.log('[Login] Attempting login with:', { email });
     
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
 
-    if (error) {
-      console.error('Login error details:', {
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        name: error.name
-      });
+    console.log('[Login] Login successful, getting user data...');
+    
+    // Force fresh data
+    const { data: { user } } = await supabase.auth.getUser();
+    console.log('[Login] Retrieved user:', JSON.stringify(user, null, 2));
+    
+    if (user?.id) {
+      console.log('[Login] Fetching profile for user ID:', user.id);
       
-      // More descriptive error message
-      let errorMessage = `${error.message}\nStatus: ${error.status || 'N/A'}\nCode: ${error.code || 'N/A'}`;
-      Alert.alert('Login Failed', errorMessage);
-    } else {
-      console.log('Login successful');
-      router.replace('/(tabs)');
+      // Get true source of truth from database
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+      console.log('[Login] Retrieved profile:', JSON.stringify(profile, null, 2));
+
+      // Clean up all role declarations
+      console.log('[Login] Updating user metadata with role:', profile.role);
+      await supabase.auth.updateUser({
+        data: { 
+          role: profile.role,
+          // Remove conflicting declarations
+          identity_data: null 
+        }
+      });
+
+      // For admin-level correction (if needed)
+      console.log('[Login] Updating admin metadata if needed');
+      await supabase.auth.admin.updateUserById(user.id, {
+        user_metadata: { role: profile.role }
+      });
+
+      // Get updated session
+      const { data: { session: updatedSession } } = await supabase.auth.getSession();
+      console.log('[Login] Updated session after role update:', JSON.stringify(updatedSession, null, 2));
+
+      // Redirect based on role
+      console.log('[Login] Redirecting based on role:', profile.role);
+      switch(profile.role) {
+        case 'admin':
+          router.replace('/(tabsAdmin)');
+          break;
+        case 'teacher':
+          router.replace('/(tabsTeacher)');
+          break;
+        default: // student or any other role
+          router.replace('/(tabs)');
+      }
+      return;
     }
-  } catch (unexpectedError) {
-    console.error('Unexpected error during login:', unexpectedError);
-    Alert.alert('Login Error', 'An unexpected error occurred. Please try again later.');
+
+    console.log('[Login] No user ID found, default redirect');
+    router.replace('/(tabs)');
+  } catch (error) {
+    console.error('[Login] Error:', error);
+    Alert.alert('Login Failed', error instanceof Error ? error.message : 'Could not verify user role');
   } finally {
     setLoading(false);
   }
@@ -78,9 +114,10 @@ const handleLogin = async () => {
           secureTextEntry
         />
 
+        <Link href="/(auth)/ChangePassword" asChild>
         <TouchableOpacity style={styles.forgotPassword}>
           <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-        </TouchableOpacity>
+        </TouchableOpacity></Link>
 
         <TouchableOpacity 
           style={styles.button} 
