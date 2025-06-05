@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,11 +9,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Modal,
-  FlatList
+  FlatList, // Pastikan FlatList diimport
+  Image
 } from 'react-native';
 import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
-import { Plus, BookOpen, Users, Edit, Trash2, Eye, Settings } from 'lucide-react-native';
+import { Plus, BookOpen, Users, Edit, Trash2, Eye, Settings, ChevronRight, FileText, CheckSquare } from 'lucide-react-native';
+import { useRouter } from 'expo-router'; // Untuk navigasi
 
 // Context and Services
 import { useTheme } from '../context/ThemeContext';
@@ -21,29 +22,34 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '@/app/utils/supabase';
 
 // Types and Models
-import { Course } from '@/models/course';
+import { Course, getGradeLevelLabel } from '@/models/course';
 import { profile } from '@/models/profile';
+// Import Lesson, Exam jika diperlukan untuk navigasi atau data ringkasan
+import { Lesson } from '@/models/lesson';
+import { Exam } from '@/models/Exam';
+
 
 // Components
-import CourseCard from '@/components/CourseCard';
+import CourseCard from '@/components/CourseCard'; // Mungkin tidak digunakan jika tabel lebih detail
 import MakeCourseForm from '@/components/MakeCourseForm';
 
 // Extended Course type with stats
 interface CourseWithStats extends Course {
   student_count: number;
-  enrollment_count: number;
+  enrollment_count: number; // Mungkin sama dengan student_count
   avg_progress: number;
+  lesson_count: number; // Tambahkan jumlah lesson
+  exam_exists: boolean; // Tambahkan status exam
 }
 
 // Screen states
-type ViewMode = 'dashboard' | 'create' | 'edit';
+type ViewMode = 'dashboard' | 'createCourse' | 'editCourse';
 
 export default function TeacherCourseDashboard() {
   const { colors } = useTheme();
-  const { session, loading: authLoading } = useAuth(); // ✅ Add authLoading from context
+  const { session, loading: authLoading } = useAuth();
+  const router = useRouter();
 
-  
-  // State management
   const [userProfile, setUserProfile] = useState<profile | null>(null);
   const [courses, setCourses] = useState<CourseWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,256 +60,192 @@ export default function TeacherCourseDashboard() {
 
   const styles = getStyles(colors);
 
-// ✅ Debug logging
-  useEffect(() => {
-    console.log('TeacherCourseDashboard Debug:', {
-      session: session ? 'exists' : 'null',
-      userId: session?.user?.id,
-      authLoading: authLoading ?? 'undefined',
-      userProfile: userProfile?.role ?? 'null',
-      componentLoading: loading,
-      error
-    });
-  }, [session, authLoading, userProfile, loading, error]);
-  // ✅ Wait for auth to complete before checking role
-  useEffect(() => {
-    console.log('useEffect triggered:', { authLoading, session: !!session });
-    
-    // Only proceed if auth is not loading
-    if (authLoading === false) { // Explicit false check
-      checkUserRole();
-    }
-  }, [session, authLoading]);
+  const fetchInitialData = useCallback(async () => {
+    if (authLoading) return; // Tunggu auth selesai
 
-  useEffect(() => {
-    if (userProfile && (userProfile.role === 'teacher' || userProfile.role === 'admin')) {
-      fetchTeacherCourses();
-    }
-  }, [userProfile]);
-
- 
-  // ✅ Fixed checkUserRole function
-  const checkUserRole = async () => {
-    console.log('checkUserRole called:', { 
-      session: !!session, 
-      userId: session?.user?.id,
-      authLoading 
-    });
-
-    // Reset Error state
+    setLoading(true);
     setError(null);
 
     if (!session?.user) {
-      console.log('No session or user found');
-      setError('Authentication required');
-      setLoading(false); // ✅ Important: Stop loading
+      setError('Authentication required. Please log in.');
+      setLoading(false);
       return;
     }
 
-
     try {
-        setLoading(true);
-        const { data, error } = await supabase
+      // 1. Fetch User Profile & Check Role
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', session.user.id)
         .single();
 
-      if (error) throw error;
+      if (profileError) throw profileError;
 
-      if (data.role !== 'teacher' && data.role !== 'admin') {
-        setError('Access denied. Only teachers and admins can access this page.');
+      if (!profileData || (profileData.role !== 'teacher' && profileData.role !== 'admin')) {
+        setError('Access Denied. This page is for teachers and admins only.');
+        setUserProfile(profileData); // Set profile agar bisa menampilkan nama jika ada
         setLoading(false);
         return;
       }
+      setUserProfile(profileData);
 
-      setUserProfile(data);
-    } catch (err: any) {
-      console.error('Error checking user role:', err);
-      setError(err.message);
-      setLoading(false);
-    }
-  };
-
-  // Show Loading Spinner while auth initializes
-  if (authLoading === true) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-    // ✅ Show loading while checking user role (only after auth is complete)
-  if (loading && !refreshing && !error) {
-    console.log('Rendering component loading state');
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Checking permissions...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-  // ✅ Show error state
-  if (error) {
-    console.log('Rendering error state:', error);
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centerContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={() => {
-              setError(null);
-              setLoading(true);
-              checkUserRole();
-            }}
-          >
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-  // Fetch teacher's courses with statistics
-  const fetchTeacherCourses = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Fetch courses created by the teacher
+      // 2. Fetch Courses for Teacher
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
-        .select('*')
-        .eq('teacher_id', session?.user.id)
+        .select('*, lessons(count), exams(count)') // Fetch count of lessons and exams
+        .eq('teacher_id', session.user.id)
         .order('created_at', { ascending: false });
 
       if (coursesError) throw coursesError;
 
-      // Fetch enrollment statistics for each course
-      const coursesWithStats: CourseWithStats[] = await Promise.all(
+      // 3. Fetch Enrollment Statistics for each course
+      const coursesWithFullStats: CourseWithStats[] = await Promise.all(
         coursesData.map(async (course) => {
-          // Get enrollment count and average progress
           const { data: enrollments, error: enrollmentError } = await supabase
             .from('enrollments')
             .select('progress_percentage')
             .eq('course_id', course.id);
 
           if (enrollmentError) {
-            console.error('Error fetching enrollments:', enrollmentError);
+            console.error(`Error fetching enrollments for course ${course.id}:`, enrollmentError);
+            // Tetap tampilkan course meski stats gagal diambil
             return {
               ...course,
               student_count: 0,
               enrollment_count: 0,
-              avg_progress: 0
+              avg_progress: 0,
+              // @ts-ignore supabase-js v2 types might not show nested counts directly
+              lesson_count: course.lessons?.[0]?.count || 0,
+              // @ts-ignore
+              exam_exists: (course.exams?.[0]?.count || 0) > 0,
             };
           }
 
-          const studentCount = enrollments.length;
-          const avgProgress = studentCount > 0 
-            ? enrollments.reduce((sum, enrollment) => sum + (enrollment.progress_percentage || 0), 0) / studentCount
+          const studentCount = enrollments?.length || 0;
+          const avgProgress = studentCount > 0
+            ? (enrollments.reduce((sum, enrollment) => sum + (enrollment.progress_percentage || 0), 0) / studentCount)
             : 0;
 
           return {
             ...course,
             student_count: studentCount,
             enrollment_count: studentCount,
-            avg_progress: Math.round(avgProgress)
+            avg_progress: Math.round(avgProgress),
+            // @ts-ignore
+            lesson_count: course.lessons?.[0]?.count || 0,
+            // @ts-ignore
+            exam_exists: (course.exams?.[0]?.count || 0) > 0,
           };
         })
       );
+      setCourses(coursesWithFullStats);
 
-      setCourses(coursesWithStats);
     } catch (err: any) {
-      console.error('Error fetching courses:', err);
-      setError(err.message);
+      console.error('Error fetching teacher dashboard data:', err);
+      setError(err.message || 'An unexpected error occurred.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [session, authLoading]);
 
-  // Handle course creation success
-  const handleCourseCreated = (newCourse: Course) => {
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
+
+
+  const handleCourseCreatedOrUpdated = () => {
     setViewMode('dashboard');
-    fetchTeacherCourses(); // Refresh the list
+    setEditingCourse(null);
+    fetchInitialData(); // Refresh the list
   };
 
-  // Handle course deletion
-  const handleDeleteCourse = (course: Course) => {
+  const handleDeleteCourse = (course: CourseWithStats) => {
     Alert.alert(
       'Delete Course',
-      `Are you sure you want to delete "${course.title}"? This action cannot be undone and will affect all enrolled students.`,
+      `Are you sure you want to delete "${course.title}"? This action cannot be undone and will affect all enrolled students, lessons, and exams.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => deleteCourse(course.id)
-        }
+          onPress: async () => {
+            try {
+              setLoading(true);
+              // Supabase RLS harus di-setup untuk cascade delete lessons, exams, enrollments
+              const { error: deleteError } = await supabase
+                .from('courses')
+                .delete()
+                .eq('id', course.id);
+              if (deleteError) throw deleteError;
+              Alert.alert('Success', 'Course deleted successfully.');
+              fetchInitialData();
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to delete course.');
+              setLoading(false);
+            }
+          },
+        },
       ]
     );
   };
 
-  // Delete course from database
-  const deleteCourse = async (courseId: string) => {
-    try {
-      setLoading(true);
-
-      // Delete course (this should cascade delete related enrollments)
-      const { error } = await supabase
-        .from('courses')
-        .delete()
-        .eq('id', courseId);
-
-      if (error) throw error;
-
-      Alert.alert('Success', 'Course deleted successfully');
-      fetchTeacherCourses(); // Refresh the list
-    } catch (err: any) {
-      console.error('Error deleting course:', err);
-      Alert.alert('Error', err.message || 'Failed to delete course');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Refresh data
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchTeacherCourses();
+    fetchInitialData();
   };
 
-  // Render unauthorized access
-  const renderUnauthorized = () => (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>
-          {error || 'Access denied. Only teachers and admins can access this page.'}
-        </Text>
-      </View>
-    </SafeAreaView>
-  );
+  // --- Navigation Functions ---
+  const navigateToEditCourse = (course: Course) => {
+    setEditingCourse(course);
+    setViewMode('editCourse');
+  };
 
-  // Render loading state
-  const renderLoading = () => (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading your courses...</Text>
-      </View>
-    </SafeAreaView>
-  );
+  const navigateToManageLessons = (courseId: string, courseTitle: string) => {
+    // Asumsi Anda memiliki screen untuk manage lessons
+    router.push({ pathname: `/teacher/manage-lessons`, params: { courseId, courseTitle } });
+  };
 
-  // Render statistics header
+  const navigateToManageExam = (courseId: string, courseTitle: string, examExists: boolean) => {
+    // Asumsi Anda memiliki screen untuk manage exam
+    router.push({ pathname: `/teacher/manage-exam`, params: { courseId, courseTitle, examExists: examExists.toString() } });
+  };
+  
+  // --- Render Functions ---
+
+  if (authLoading || (loading && !refreshing && courses.length === 0 && !error)) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>
+            {authLoading ? 'Authenticating...' : 'Loading dashboard...'}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          {error.includes('Access Denied') ? null : (
+            <TouchableOpacity style={styles.retryButton} onPress={fetchInitialData}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+  
   const renderStatsHeader = () => {
+    if (courses.length === 0) return null;
     const totalStudents = courses.reduce((sum, course) => sum + course.student_count, 0);
-    const avgProgressAll = courses.length > 0 
+    const avgProgressAll = courses.length > 0
       ? courses.reduce((sum, course) => sum + course.avg_progress, 0) / courses.length
       : 0;
 
@@ -328,100 +270,111 @@ export default function TeacherCourseDashboard() {
     );
   };
 
-  // Render course item with actions
-  const renderCourseItem = ({ item: course }: { item: CourseWithStats }) => (
-    <Animated.View entering={FadeInDown.duration(500)} style={styles.courseItem}>
-      <CourseCard course={course} variant="horizontal" />
+  const renderCourseRow = ({ item: course }: { item: CourseWithStats }) => (
+  <Animated.View entering={FadeInDown.duration(300)} style={styles.courseRow}>
+    <View style={styles.courseInfoContent}>
+      <Image 
+        source={{ uri: course.thumbnail_url || 'https://via.placeholder.com/120x90' }} 
+        style={styles.horizontalImage} 
+      />
+      <View style={styles.courseTextContent}>
+        <Text style={styles.courseTitleText} numberOfLines={2}>{course.title}</Text>
+        <Text style={styles.courseDetailText}>{getGradeLevelLabel(course.grade_level)} • {course.lesson_count} Lessons</Text>
+        <Text style={styles.courseDetailText}>{course.student_count} Students • {course.avg_progress}% Avg. Progress</Text>
+      </View>
+    </View>
+    
+    <View style={styles.divider} />
+    
+    <View style={styles.courseActionsContainer}>
+      <TouchableOpacity 
+        style={[styles.actionButtonSmall, styles.editButton]} 
+        onPress={() => navigateToEditCourse(course)}
+      >
+        <Edit size={18} color={colors.background} />
+        <Text style={styles.actionButtonText}>Edit</Text>
+      </TouchableOpacity>
       
-      {/* Course Stats */}
-      <View style={styles.courseStats}>
-        <Text style={styles.courseStatText}>
-          {course.student_count} students • {course.avg_progress}% avg progress
-        </Text>
-      </View>
+      <TouchableOpacity 
+        style={[styles.actionButtonSmall, styles.lessonsButton]} 
+        onPress={() => navigateToManageLessons(course.id, course.title)}
+      >
+        <FileText size={18} color={colors.background} />
+        <Text style={styles.actionButtonText}>Lessons</Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity 
+        style={[styles.actionButtonSmall, styles.examButton]} 
+        onPress={() => navigateToManageExam(course.id, course.title, course.exam_exists)}
+      >
+        <CheckSquare size={18} color={colors.background} />
+        <Text style={styles.actionButtonText}>Exam</Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity 
+        style={[styles.actionButtonSmall, styles.deleteButton]} 
+        onPress={() => handleDeleteCourse(course)}
+      >
+        <Trash2 size={18} color={colors.background} />
+        <Text style={styles.actionButtonText}>Delete</Text>
+      </TouchableOpacity>
+    </View>
+  </Animated.View>
+);
 
-      {/* Action Buttons */}
-      <View style={styles.courseActions}>
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.viewButton]}
-          onPress={() => {/* Navigate to course details */}}
-        >
-          <Eye size={16} color={colors.primary} />
-          <Text style={styles.actionButtonText}>View</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.editButton]}
-          onPress={() => {
-            setEditingCourse(course);
-            setViewMode('edit');
-          }}
-        >
-          <Edit size={16} color={colors.warning} />
-          <Text style={styles.actionButtonText}>Edit</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => handleDeleteCourse(course)}
-        >
-          <Trash2 size={16} color={colors.error} />
-          <Text style={styles.actionButtonText}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </Animated.View>
-  );
-
-  // Render empty state
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <BookOpen size={64} color={colors.textSecondary} />
-      <Text style={styles.emptyTitle}>No courses yet</Text>
+      <Text style={styles.emptyTitle}>Kamu belum membuat Course</Text>
       <Text style={styles.emptySubtitle}>
-        Create your first course to start teaching students
+        Klik tombol di bawah untuk mulai membuat kursus pertamamu.
       </Text>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.createFirstButton}
-        onPress={() => setViewMode('create')}
+        onPress={() => { setEditingCourse(null); setViewMode('createCourse'); }}
       >
         <Plus size={20} color={colors.background} />
-        <Text style={styles.createFirstButtonText}>Create Your First Course</Text>
+        <Text style={styles.createFirstButtonText}>Buat Course Baru</Text>
       </TouchableOpacity>
     </View>
   );
 
-  // Render dashboard content
   const renderDashboard = () => (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Course Dashboard</Text>
           <Text style={styles.headerSubtitle}>
-            Welcome back, {userProfile?.full_name || 'Teacher'}
+            Welcome, {userProfile?.full_name || 'Teacher'}!
           </Text>
         </View>
-        <TouchableOpacity 
-          style={styles.createButton}
-          onPress={() => setViewMode('create')}
-        >
-          <Plus size={20} color={colors.background} />
-          <Text style={styles.createButtonText}>Create Course</Text>
-        </TouchableOpacity>
+        {courses.length > 0 && ( // Hanya tampilkan jika sudah ada course
+             <TouchableOpacity
+             style={styles.createButton}
+             onPress={() => { setEditingCourse(null); setViewMode('createCourse');}}
+           >
+             <Plus size={20} color={colors.background} />
+             <Text style={styles.createButtonText}>Buat Course</Text>
+           </TouchableOpacity>
+        )}
       </View>
 
-      {/* Statistics */}
-      {courses.length > 0 && renderStatsHeader()}
+      {renderStatsHeader()}
 
-      {/* Course List */}
-      {courses.length === 0 ? (
+      {courses.length === 0 && !loading ? (
         renderEmptyState()
       ) : (
         <FlatList
           data={courses}
           keyExtractor={(item) => item.id}
-          renderItem={renderCourseItem}
-          contentContainerStyle={styles.coursesList}
+          renderItem={renderCourseRow}
+          contentContainerStyle={styles.coursesListContainer}
+          ListHeaderComponent={
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableHeaderText, styles.tableHeaderInfo]}>Course Info</Text>
+              <Text style={[styles.tableHeaderText, styles.tableHeaderActions]}>Actions</Text>
+            </View>
+          }
           refreshing={refreshing}
           onRefresh={handleRefresh}
           showsVerticalScrollIndicator={false}
@@ -431,25 +384,14 @@ export default function TeacherCourseDashboard() {
   );
 
   // Main render logic
-  if (loading && !refreshing) return renderLoading();
-  if (error && !userProfile) return renderUnauthorized();
-
   switch (viewMode) {
-    case 'create':
+    case 'createCourse':
+    case 'editCourse':
       return (
         <SafeAreaView style={styles.container}>
-          <MakeCourseForm
-            onSuccess={handleCourseCreated}
-            onCancel={() => setViewMode('dashboard')}
-          />
-        </SafeAreaView>
-      );
-
-    case 'edit':
-      return (
-        <SafeAreaView style={styles.container}>
-          <MakeCourseForm
-            onSuccess={handleCourseCreated}
+          <MakeCourseForm 
+            initialCourseData={editingCourse}
+            onSuccess={handleCourseCreatedOrUpdated}
             onCancel={() => {
               setViewMode('dashboard');
               setEditingCourse(null);
@@ -457,12 +399,10 @@ export default function TeacherCourseDashboard() {
           />
         </SafeAreaView>
       );
-
-    default:
+    default: // dashboard
       return renderDashboard();
   }
 }
-
 const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
   StyleSheet.create({
     container: {
@@ -478,170 +418,161 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'flex-start',
+      alignItems: 'center', // Ubah ke center untuk alignment yang lebih baik
       paddingHorizontal: 16,
-      paddingTop: Platform.OS === 'ios' ? 16 : 48,
-      paddingBottom: 16,
+      paddingTop: Platform.OS === 'ios' ? 24 : 48, // Sesuaikan padding top
+      paddingBottom: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
     },
     headerTitle: {
       fontFamily: 'Inter-Bold',
-      fontSize: 28,
+      fontSize: 24, // Sedikit lebih kecil
       color: colors.textPrimary,
     },
     headerSubtitle: {
       fontFamily: 'Inter-Regular',
-      fontSize: 16,
+      fontSize: 14,
       color: colors.textSecondary,
-      marginTop: 4,
+      marginTop: 2,
     },
     createButton: {
       backgroundColor: colors.primary,
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 8,
     },
     createButtonText: {
       fontFamily: 'Inter-SemiBold',
       fontSize: 14,
       color: colors.background,
-      marginLeft: 8,
+      marginLeft: 6,
     },
     statsContainer: {
       flexDirection: 'row',
-      paddingHorizontal: 16,
-      marginBottom: 24,
-    },
-    retryButton: {
-      backgroundColor: colors.primary,
-      paddingHorizontal: 24,
-      paddingVertical: 12,
-      borderRadius: 8,
-      marginTop: 16,
-    },
-    retryButtonText: {
-      fontFamily: 'Inter-SemiBold',
-      fontSize: 16,
-      color: colors.background,
+      paddingHorizontal: 12, // Sedikit kurangi padding
+      paddingVertical: 16,
+      justifyContent: 'space-around',
     },
     statCard: {
       flex: 1,
       backgroundColor: colors.card,
-      padding: 16,
-      borderRadius: 12,
+      padding: 12,
+      borderRadius: 10,
       alignItems: 'center',
-      marginHorizontal: 4,
-      ...Platform.select({
-        ios: {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-        },
-        android: {
-          elevation: 2,
-        },
-      }),
+      marginHorizontal: 4, // Jarak antar kartu
+      elevation: 1, // Shadow minimal untuk Android
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
     },
     statNumber: {
       fontFamily: 'Inter-Bold',
-      fontSize: 24,
+      fontSize: 20,
       color: colors.textPrimary,
-      marginTop: 8,
+      marginTop: 6,
     },
     statLabel: {
       fontFamily: 'Inter-Medium',
-      fontSize: 12,
+      fontSize: 11,
       color: colors.textSecondary,
-      marginTop: 4,
+      marginTop: 2,
+      textAlign: 'center',
     },
-    coursesList: {
-      padding: 16,
+    coursesListContainer: {
+      paddingHorizontal: 16,
+      paddingBottom: 24,
     },
-    courseItem: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 16,
-      ...Platform.select({
-        ios: {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
-        },
-        android: {
-          elevation: 3,
-        },
-      }),
+    tableHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      marginBottom: 8,
     },
-    courseStats: {
-      paddingTop: 12,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      marginTop: 12,
-    },
-    courseStatText: {
-      fontFamily: 'Inter-Medium',
+    tableHeaderText: {
+      fontFamily: 'Inter-SemiBold',
       fontSize: 14,
       color: colors.textSecondary,
     },
-    courseActions: {
-      flexDirection: 'row',
-      marginTop: 12,
-      gap: 8,
+    tableHeaderInfo: {
+      flex: 3, // Beri lebih banyak ruang untuk info
     },
-    actionButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 8,
-      flex: 1,
-      justifyContent: 'center',
+    tableHeaderActions: {
+      flex: 1, // Ruang untuk actions
+      textAlign: 'right',
     },
-    viewButton: {
-      backgroundColor: colors.primary + '20',
+    courseRow: {
+  backgroundColor: colors.card,
+  borderRadius: 8,
+  padding: 12,
+  marginBottom: 12,
+  elevation: 1,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.05,
+  shadowRadius: 2,
+},
+    courseInfoCell: {
+      flex: 3, // Sesuai dengan header
+      marginRight: 8,
     },
-    editButton: {
-      backgroundColor: colors.warning + '20',
+    courseTitleText: {
+      fontFamily: 'Inter-SemiBold',
+      fontSize: 16,
+      color: colors.textPrimary,
+      marginBottom: 4,
     },
-    deleteButton: {
-      backgroundColor: colors.error + '20',
-    },
-    actionButtonText: {
-      fontFamily: 'Inter-Medium',
+    courseDetailText: {
+      fontFamily: 'Inter-Regular',
       fontSize: 12,
-      marginLeft: 4,
+      color: colors.textSecondary,
+      marginBottom: 2,
     },
+    courseActionsCell: {
+      flex: 1, // Sesuai dengan header
+      flexDirection: 'row',
+      justifyContent: 'flex-end', // Ratakan tombol ke kanan
+      alignItems: 'center',
+    },
+    actionButtonSmall: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: 6,
+},
     emptyContainer: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
       padding: 32,
+      marginTop: 40, // Beri jarak dari header jika ada
     },
     emptyTitle: {
       fontFamily: 'Inter-Bold',
-      fontSize: 24,
+      fontSize: 22,
       color: colors.textPrimary,
-      marginTop: 16,
+      marginTop: 20,
+      textAlign: 'center',
     },
     emptySubtitle: {
       fontFamily: 'Inter-Regular',
-      fontSize: 16,
+      fontSize: 15,
       color: colors.textSecondary,
       textAlign: 'center',
-      marginTop: 8,
-      lineHeight: 24,
+      marginTop: 10,
+      lineHeight: 22,
     },
     createFirstButton: {
       backgroundColor: colors.primary,
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 24,
-      paddingVertical: 16,
-      borderRadius: 12,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 8,
       marginTop: 24,
     },
     createFirstButtonText: {
@@ -655,11 +586,65 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
       fontSize: 16,
       color: colors.error,
       textAlign: 'center',
+      marginBottom: 16,
     },
     loadingText: {
       fontFamily: 'Inter-Medium',
       fontSize: 16,
       color: colors.textSecondary,
+      marginTop: 12,
+    },
+    retryButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 8,
       marginTop: 16,
+    },
+    retryButtonText: {
+      fontFamily: 'Inter-SemiBold',
+      fontSize: 16,
+      color: colors.background,
+    },
+    courseInfoContent: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
+    horizontalImage: {
+      width: 80,
+      height: 60,
+      borderRadius: 6,
+      marginRight: 10,
+    },
+    courseTextContent: {
+      flex: 1,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: 10,
+    },
+    courseActionsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 8,
+    },
+    actionButtonText: {
+      fontFamily: 'Inter-Medium',
+      fontSize: 12,
+      color: colors.background,
+      marginLeft: 4,
+    },
+    editButton: {
+      backgroundColor: colors.primary,
+    },
+    lessonsButton: {
+      backgroundColor: colors.success,
+    },
+    examButton: {
+      backgroundColor: colors.warning,
+    },
+    deleteButton: {
+      backgroundColor: colors.error,
     },
   });
