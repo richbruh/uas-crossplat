@@ -128,100 +128,112 @@ export default function LessonScreen() {
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+ // Replace the render logic after loading check:
 
-  if (!lesson) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text>Lesson not found</Text>
-      </View>
-    );
-  }
-  const lessonIndex = courseLessons.findIndex(l => l.id === lesson.id);
-  const prevLesson = lessonIndex > 0 ? courseLessons[lessonIndex - 1] : null;
-  const nextLesson = lessonIndex < courseLessons.length - 1 ? courseLessons[lessonIndex + 1] : null;
-  const isCompleted = enrollment && enrollment.completed_lessons >= lesson.lesson_order;
-
+if (loading) {
   return (
-    <>
-      <Stack.Screen 
-        options={{ 
-          headerShown: false,
-          animation: 'slide_from_bottom',
-        }} 
-      />
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-            <X size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {course.title}
-          </Text>
-          <View style={styles.placeholder} />
-        </View>
-
-        <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-          <View style={styles.lessonInfo}>
-            <Text style={styles.lessonTitle}>{lesson.title}</Text>
-            <Text style={styles.lessonOrder}>Lesson #{lesson.lesson_order}</Text>
-            {isCompleted && (
-              <View style={styles.completedBadge}>
-                <CheckCircle size={16} color="#10B981" />
-                <Text style={styles.completedText}>Completed</Text>
-              </View>
-            )}
-          </View>
-          
-          <View style={styles.lessonContent}>
-            <Text style={styles.contentText}>
-              {lesson.content || 'No content available.'}
-            </Text>
-          </View>
-        </ScrollView>
-        
-        <View style={styles.navigationContainer}>
-          <TouchableOpacity 
-            style={[styles.navButton, !prevLesson && styles.disabledButton]} 
-            disabled={!prevLesson}
-            onPress={() => prevLesson && router.replace(`/lesson/${prevLesson.id}`)}
-          >
-            <ChevronLeft size={20} color={prevLesson ? colors.primary : colors.textTertiary} />
-            <Text style={[styles.navButtonText, !prevLesson && styles.disabledButtonText]}>Previous</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.completeButton, isCompleted && styles.completedButton]}
-            disabled={completing || isCompleted}
-            onPress={handleCompleteLesson}
-          >
-            {completing ? (
-              <ActivityIndicator size="small" color={colors.background} />
-            ) : (
-              <Text style={[styles.completeButtonText, isCompleted && styles.completedButtonText]}>
-                {isCompleted ? '✓ Completed' : 'Complete'}
-              </Text>
-            )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.navButton, !nextLesson && styles.disabledButton]} 
-            disabled={!nextLesson}
-            onPress={() => nextLesson && router.replace(`/lesson/${nextLesson.id}`)}
-          >
-            <Text style={[styles.navButtonText, !nextLesson && styles.disabledButtonText]}>Next</Text>
-            <ChevronRight size={20} color={nextLesson ? colors.primary : colors.textTertiary} />
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    </>
+    <View style={styles.centerContainer}>
+      <ActivityIndicator size="large" color={colors.primary} />
+    </View>
   );
+}
+
+if (!lesson || !course) {  // ✅ Check both lesson AND course
+  return (
+    <View style={styles.centerContainer}>
+      <Text style={styles.errorText}>Lesson not found</Text>
+      <TouchableOpacity 
+        style={styles.backButton} 
+        onPress={() => router.back()}
+      >
+        <Text style={styles.backButtonText}>Go Back</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ✅ Now we're guaranteed course is not null below this point
+const lessonIndex = courseLessons.findIndex(l => l.id === lesson.id);
+const prevLesson = lessonIndex > 0 ? courseLessons[lessonIndex - 1] : null;
+const nextLesson = lessonIndex < courseLessons.length - 1 ? courseLessons[lessonIndex + 1] : null;
+
+// ✅ Safe boolean calculation
+const isCompleted = enrollment !== null && enrollment.completed_lessons >= lesson.lesson_order;
+
+return (
+  <>
+    <Stack.Screen 
+      options={{ 
+        headerShown: false,
+        animation: 'slide_from_bottom',
+      }} 
+    />
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+          <X size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {course.title}  {/* ✅ Safe: course is guaranteed not null */}
+        </Text>
+        <View style={styles.placeholder} />
+      </View>
+
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.lessonInfo}>
+          <Text style={styles.lessonTitle}>{lesson.title}</Text>
+          <Text style={styles.lessonOrder}>Lesson #{lesson.lesson_order}</Text>
+          {isCompleted && (
+            <View style={styles.completedBadge}>
+              <CheckCircle size={16} color="#10B981" />
+              <Text style={styles.completedText}>Completed</Text>
+            </View>
+          )}
+        </View>
+        
+        <View style={styles.lessonContent}>
+          <Text style={styles.contentText}>
+            {lesson.content || 'No content available.'}
+          </Text>
+        </View>
+      </ScrollView>
+      
+      <View style={styles.navigationContainer}>
+        <TouchableOpacity 
+          style={[styles.navButton, !prevLesson && styles.disabledButton]} 
+          disabled={!prevLesson}  // ✅ boolean | undefined (correct)
+          onPress={() => prevLesson && router.replace(`/lesson/${prevLesson.id}`)}
+        >
+          <ChevronLeft size={20} color={prevLesson ? colors.primary : colors.textTertiary} />
+          <Text style={[styles.navButtonText, !prevLesson && styles.disabledButtonText]}>Previous</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.completeButton, isCompleted && styles.completedButton]}
+          disabled={completing || isCompleted}  // ✅ boolean (correct)
+          onPress={handleCompleteLesson}
+        >
+          {completing ? (
+            <ActivityIndicator size="small" color={colors.background} />
+          ) : (
+            <Text style={[styles.completeButtonText, isCompleted && styles.completedButtonText]}>
+              {isCompleted ? '✓ Completed' : 'Complete'}
+            </Text>
+          )}
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.navButton, !nextLesson && styles.disabledButton]} 
+          disabled={!nextLesson}  // ✅ boolean | undefined (correct)
+          onPress={() => nextLesson && router.replace(`/lesson/${nextLesson.id}`)}
+        >
+          <Text style={[styles.navButtonText, !nextLesson && styles.disabledButtonText]}>Next</Text>
+          <ChevronRight size={20} color={nextLesson ? colors.primary : colors.textTertiary} />
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  </>
+);
 }
 
 const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
@@ -360,5 +372,23 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
   },
   completedButtonText: {
     color: colors.background,
-  }
+  },
+  errorText: {
+      fontFamily: 'Inter-Regular',
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: 16,
+    },
+    backButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 8,
+    },
+    backButtonText: {
+      fontFamily: 'Inter-Medium',
+      fontSize: 14,
+      color: colors.background,
+    }
 });
