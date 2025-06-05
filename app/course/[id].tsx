@@ -63,11 +63,23 @@ export default function CourseDetailScreen() {
         .from('lessons')
         .select('*')
         .eq('course_id', id)
+//      .eq('is_published', true) // Only fetch published lessons
         .order('lesson_order', { ascending: true });
       
-      if (lessonsError) throw lessonsError;
-      setLessons(lessonsData || []);
+      console.log('📚 Lessons Query Debug:', {
+        courseId: id,
+        lessonsData: lessonsData,
+        lessonsError: lessonsError,
+        lessonsCount: lessonsData?.length || 0
+      });
 
+      if (lessonsError) {
+        console.error('❌ Lessons fetch error:', lessonsError);
+        throw lessonsError;
+      }
+
+      console.log('✅ Lessons fetched successfully:', lessonsData);
+      setLessons(lessonsData || []);
       // Check if user is enrolled (only if logged in)
       if (session?.user) {
           console.log('🔍 Checking enrollment for user:', session.user.id);
