@@ -4,11 +4,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "EXPO_NO_TELEMETRY=1 expo start",
-    "build:web": "expo export --platform web",
-    "lint": "expo lint",
-    "android": "expo run:android",
-    "ios": "expo run:ios"
+    "dev": "npx expo start",
+    "build:web": "npx expo export --platform web",
+    "lint": "npx expo lint",
+    "android": "npx expo run:android",
+    "ios": "npx expo run:ios",
+    "prebuild": "npx expo prebuild"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.2.3",
@@ -16,13 +17,10 @@
     "@lucide/lab": "^0.1.2",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-picker/picker": "2.11.0",
-    "@react-navigation/bottom-tabs": "^7.2.0",
-    "react-native-polyfill-globals": "^0.4.0",
-    "@react-navigation/native": "^7.0.14",
-    "@supabase/supabase-js": "^2.49.4",
-    "date-fns": "^4.1.0",
+    "@supabase/supabase-js": "2.39.0",
+    "date-fns": "4.1.0",
     "dotenv": "^16.5.0",
-    "expo": "53.0.10",
+    "expo": "^53.0.10",
     "expo-av": "~15.1.5",
     "expo-blur": "~14.1.5",
     "expo-camera": "~16.1.7",
@@ -43,6 +41,7 @@
     "react-dom": "19.0.0",
     "react-native": "0.79.3",
     "react-native-gesture-handler": "~2.24.0",
+    "react-native-polyfill-globals": "3.1.0",
     "react-native-progress": "^5.0.1",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
@@ -51,6 +50,7 @@
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "^0.20.0",
     "react-native-webview": "13.13.5",
+    "readable-stream": "^4.5.2",
     "zustand": "^4.5.2"
   },
   "devDependencies": {
@@ -58,5 +58,10 @@
     "@types/react": "~19.0.10",
     "babel-plugin-module-resolver": "^5.0.0",
     "typescript": "~5.8.3"
+  },
+  "overrides": {
+    "lucide-react-native": {
+      "react": "$react"
+    }
   }
 }
