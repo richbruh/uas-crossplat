@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -14,12 +14,13 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, X } from 'lucide-react-native';
-import { useTheme } from '../app/context/ThemeContext';
-import { useAuth } from '../app/context/AuthContext';
-import { supabase } from '@/app/utils/supabase';
-import { Course } from '@/models/course';
+import { useTheme } from '../app/context/ThemeContext'; // Pastikan path ini benar
+import { useAuth } from '../app/context/AuthContext';   // Pastikan path ini benar
+import { supabase } from '@/app/utils/supabase';      // Pastikan path ini benar
+import { Course } from '@/models/course';           // Pastikan path ini benar
 
-interface MakeCourseFormProps {
+export interface MakeCourseFormProps {
+  initialCourseData?: Course | null; // Untuk mode edit
   onSuccess?: (course: Course) => void;
   onCancel?: () => void;
 }
@@ -32,7 +33,6 @@ interface CourseFormData {
   total_lessons: number;
 }
 
-// Fix: Define proper error types
 interface FormErrors {
   title?: string;
   grade_level?: string;
@@ -41,95 +41,155 @@ interface FormErrors {
   thumbnail_url?: string;
 }
 
-const GRADE_LEVELS = [1, 2, 3, 4, 5, 6];
+const GRADE_LEVELS = [1, 2, 3, 4, 5, 6]; // Lebih lengkap
 
-export default function MakeCourseForm({ onSuccess, onCancel }: MakeCourseFormProps) {
+export default function MakeCourseForm({
+  initialCourseData,
+  onSuccess,
+  onCancel
+}: MakeCourseFormProps) {
   const { colors } = useTheme();
   const { session } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [imageLoading, setImageLoading] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false); // Untuk loading upload gambar jika diimplementasikan
 
-  // Form state
+  const isEditMode = !!initialCourseData;
+
   const [formData, setFormData] = useState<CourseFormData>({
     title: '',
-    grade_level: 1,
+    grade_level: GRADE_LEVELS[0], // Default ke grade pertama
     description: '',
     thumbnail_url: null,
-    total_lessons: 1 // Fix: Start with 1 instead of 0
+    total_lessons: 1
   });
 
-  // Form validation errors - Fix: Use proper error type
   const [errors, setErrors] = useState<FormErrors>({});
-
   const styles = getStyles(colors);
 
-  // Validate form data
+  useEffect(() => {
+    if (isEditMode && initialCourseData) {
+      setFormData({
+        title: initialCourseData.title || '',
+        grade_level: initialCourseData.grade_level || GRADE_LEVELS[0],
+        description: initialCourseData.description || '',
+        thumbnail_url: initialCourseData.thumbnail_url || null,
+        total_lessons: initialCourseData.total_lessons || 1,
+      });
+    } else {
+      // Reset form untuk mode create jika diperlukan (atau biarkan default dari useState)
+      setFormData({
+        title: '',
+        grade_level: GRADE_LEVELS[0],
+        description: '',
+        thumbnail_url: null,
+        total_lessons: 1,
+      });
+    }
+  }, [initialCourseData, isEditMode]);
+
+
+  const handleInputChange = (name: keyof CourseFormData, value: string | number | null) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: undefined }));
+    }
+  };
+
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
     if (!formData.title.trim()) {
-      newErrors.title = 'Course title is required';
+      newErrors.title = 'Judul course tidak boleh kosong';
     } else if (formData.title.length < 3) {
-      newErrors.title = 'Course title must be at least 3 characters';
+      newErrors.title = 'Judul course minimal 3 karakter';
     }
 
     if (!formData.description.trim()) {
-      newErrors.description = 'Course description is required';
+      newErrors.description = 'Deskripsi course tidak boleh kosong';
     } else if (formData.description.length < 10) {
-      newErrors.description = 'Description must be at least 10 characters';
+      newErrors.description = 'Deskripsi minimal 10 karakter';
     }
 
     if (formData.total_lessons < 1) {
-      newErrors.total_lessons = 'Must have at least 1 lesson';
+      newErrors.total_lessons = 'Minimal harus ada 1 lesson';
     } else if (formData.total_lessons > 100) {
-      newErrors.total_lessons = 'Cannot exceed 100 lessons';
+      newErrors.total_lessons = 'Tidak boleh melebihi 100 lesson';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle image selection
   const selectImage = async () => {
     try {
-      // Request permission
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (permissionResult.granted === false) {
-        Alert.alert('Permission Required', 'Permission to access camera roll is required!');
+      if (!permissionResult.granted) {
+        Alert.alert('Izin Diperlukan', 'Izin untuk mengakses galeri dibutuhkan!');
         return;
       }
 
-      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [16, 9],
-        quality: 0.8,
+        quality: 0.7, // Kualitas bisa disesuaikan
       });
 
-      if (!result.canceled && result.assets[0]) {
-        setImageLoading(true);
-        
-        // For now, just use the local URI
-        // In production, you would upload to Supabase Storage
-        setFormData(prev => ({
-          ...prev,
-          thumbnail_url: result.assets[0].uri
-        }));
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        // Di sini Anda bisa langsung upload ke Supabase Storage jika mau
+        // Untuk sekarang, kita simpan URI lokalnya dulu
+        setImageLoading(true); // Anggap saja ada proses loading
+        // Simulasi upload atau proses
+        // const uploadedUrl = await uploadImageToSupabase(asset.uri); // Fungsi ini perlu dibuat
+        // handleInputChange('thumbnail_url', uploadedUrl);
+        handleInputChange('thumbnail_url', asset.uri); // Sementara pakai URI lokal
+        setImageLoading(false);
       }
     } catch (error: any) {
       console.error('Error selecting image:', error);
-      Alert.alert('Error', 'Failed to select image. Please try again.');
-    } finally {
+      Alert.alert('Error', 'Gagal memilih gambar. Silakan coba lagi.');
       setImageLoading(false);
     }
   };
 
-  // Handle form submission
+  // Fungsi placeholder untuk upload ke Supabase Storage (perlu diimplementasikan)
+  // async function uploadImageToSupabase(uri: string): Promise<string | null> {
+  //   if (!session?.user) return null;
+  //   const fileExt = uri.split('.').pop();
+  //   const fileName = `${Date.now()}.${fileExt}`;
+  //   const filePath = `${session.user.id}/${fileName}`;
+
+  //   // Convert URI ke Blob
+  //   const response = await fetch(uri);
+  //   const blob = await response.blob();
+
+  //   const { data, error } = await supabase.storage
+  //     .from('thumbnails') // Ganti 'thumbnails' dengan nama bucket Anda
+  //     .upload(filePath, blob, {
+  //       cacheControl: '3600',
+  //       upsert: false,
+  //       contentType: blob.type, // Pastikan contentType benar
+  //     });
+
+  //   if (error) {
+  //     console.error('Error uploading image to Supabase:', error);
+  //     Alert.alert('Error', 'Gagal mengupload gambar.');
+  //     return null;
+  //   }
+
+  //   // Dapatkan URL publik dari gambar yang diupload
+  //   const { data: publicUrlData } = supabase.storage
+  //     .from('thumbnails')
+  //     .getPublicUrl(filePath);
+
+  //   return publicUrlData?.publicUrl || null;
+  // }
+
+
   const handleSubmit = async () => {
     if (!session?.user) {
-      Alert.alert('Error', 'You must be logged in to create a course');
+      Alert.alert('Error', 'Anda harus login untuk melanjutkan');
       return;
     }
 
@@ -137,64 +197,70 @@ export default function MakeCourseForm({ onSuccess, onCancel }: MakeCourseFormPr
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
+      const coursePayload = {
+        title: formData.title.trim(),
+        grade_level: formData.grade_level,
+        description: formData.description.trim(),
+        thumbnail_url: formData.thumbnail_url, // Ini bisa URI lokal atau URL Supabase Storage
+        teacher_id: session.user.id,
+        total_lessons: formData.total_lessons,
+      };
 
-      // Create course in database
-      const { data, error } = await supabase
-        .from('courses')
-        .insert([
-          {
-            title: formData.title.trim(),
-            grade_level: formData.grade_level,
-            description: formData.description.trim(),
-            thumbnail_url: formData.thumbnail_url,
-            teacher_id: session.user.id,
-            total_lessons: formData.total_lessons
-          }
-        ])
-        .select()
-        .single();
+      let resultCourse: Course | null = null;
 
-      if (error) throw error;
+      if (isEditMode && initialCourseData?.id) {
+        // Update existing course
+        const { data, error } = await supabase
+          .from('courses')
+          .update(coursePayload)
+          .eq('id', initialCourseData.id)
+          .select()
+          .single();
+        if (error) throw error;
+        resultCourse = data as Course;
+        Alert.alert('Sukses', 'Course berhasil diperbarui!');
+      } else {
+        // Create new course
+        const { data, error } = await supabase
+          .from('courses')
+          .insert([coursePayload])
+          .select()
+          .single();
+        if (error) throw error;
+        resultCourse = data as Course;
+        Alert.alert('Sukses', 'Course berhasil dibuat!');
+      }
 
-      Alert.alert(
-        'Success', 
-        'Course created successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              if (onSuccess) {
-                onSuccess(data as Course);
-              }
-            }
-          }
-        ]
-      );
+      if (onSuccess && resultCourse) {
+        onSuccess(resultCourse);
+      }
 
-      // Reset form
-      setFormData({
-        title: '',
-        grade_level: 1,
-        description: '',
-        thumbnail_url: null,
-        total_lessons: 1
-      });
-      setErrors({});
-      
+      // Reset form hanya jika bukan mode edit atau jika sukses dan ingin form bersih
+      if (!isEditMode) {
+        setFormData({
+          title: '',
+          grade_level: GRADE_LEVELS[0],
+          description: '',
+          thumbnail_url: null,
+          total_lessons: 1,
+        });
+        setErrors({});
+      }
+
     } catch (error: any) {
-      console.error('Error creating course:', error);
-      Alert.alert('Error', error.message || 'Failed to create course');
+      console.error(`Error ${isEditMode ? 'updating' : 'creating'} course:`, error);
+      Alert.alert('Error', error.message || `Gagal ${isEditMode ? 'memperbarui' : 'membuat'} course`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
-        <Text style={styles.title}>Create New Course</Text>
+        <Text style={styles.title}>{isEditMode ? 'Edit Course' : 'Buat Course Baru'}</Text>
         {onCancel && (
           <TouchableOpacity onPress={onCancel} style={styles.cancelButton}>
             <X size={24} color={colors.textSecondary} />
@@ -204,19 +270,13 @@ export default function MakeCourseForm({ onSuccess, onCancel }: MakeCourseFormPr
 
       {/* Course Title */}
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Course Title *</Text>
+        <Text style={styles.label}>Judul Course *</Text>
         <TextInput
-          style={[
-            styles.textInput,
-            errors.title ? styles.inputError : null // Fix: Proper conditional styling
-          ]}
-          placeholder="Enter course title"
+          style={[styles.textInput, errors.title ? styles.inputError : null]}
+          placeholder="Masukkan judul course"
           placeholderTextColor={colors.textSecondary}
           value={formData.title}
-          onChangeText={(text) => {
-            setFormData(prev => ({ ...prev, title: text }));
-            if (errors.title) setErrors(prev => ({ ...prev, title: undefined }));
-          }}
+          onChangeText={(text) => handleInputChange('title', text)}
           maxLength={100}
         />
         {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
@@ -224,20 +284,21 @@ export default function MakeCourseForm({ onSuccess, onCancel }: MakeCourseFormPr
 
       {/* Grade Level */}
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Grade Level *</Text>
+        <Text style={styles.label}>Tingkat Kelas *</Text>
         <View style={styles.pickerContainer}>
           <Picker
             selectedValue={formData.grade_level}
-            onValueChange={(value: number) => setFormData(prev => ({ ...prev, grade_level: value }))} // Fix: Add type annotation
+            onValueChange={(value: number) => handleInputChange('grade_level', value)}
             style={styles.picker}
+            itemStyle={Platform.OS === 'ios' ? { color: colors.textPrimary } : {}} // itemStyle untuk iOS
             dropdownIconColor={colors.textSecondary}
           >
             {GRADE_LEVELS.map(level => (
               <Picker.Item
                 key={level}
-                label={`Grade ${level}`}
+                label={`Kelas ${level}`}
                 value={level}
-                color={Platform.OS === 'ios' ? colors.textPrimary : undefined}
+                color={Platform.OS === 'android' ? colors.textPrimary : undefined} // color prop untuk Android
               />
             ))}
           </Picker>
@@ -246,19 +307,15 @@ export default function MakeCourseForm({ onSuccess, onCancel }: MakeCourseFormPr
 
       {/* Total Lessons */}
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Total Lessons *</Text>
+        <Text style={styles.label}>Jumlah Lesson *</Text>
         <TextInput
-          style={[
-            styles.textInput,
-            errors.total_lessons ? styles.inputError : null // Fix: Proper conditional styling
-          ]}
-          placeholder="Number of lessons"
+          style={[styles.textInput, errors.total_lessons ? styles.inputError : null]}
+          placeholder="Jumlah lesson"
           placeholderTextColor={colors.textSecondary}
           value={formData.total_lessons.toString()}
           onChangeText={(text) => {
-            const number = parseInt(text) || 1; // Fix: Default to 1 instead of 0
-            setFormData(prev => ({ ...prev, total_lessons: number }));
-            if (errors.total_lessons) setErrors(prev => ({ ...prev, total_lessons: undefined }));
+            const number = parseInt(text);
+            handleInputChange('total_lessons', isNaN(number) ? 1 : Math.max(1, number));
           }}
           keyboardType="numeric"
           maxLength={3}
@@ -268,19 +325,13 @@ export default function MakeCourseForm({ onSuccess, onCancel }: MakeCourseFormPr
 
       {/* Description */}
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Description *</Text>
+        <Text style={styles.label}>Deskripsi *</Text>
         <TextInput
-          style={[
-            styles.textAreaInput,
-            errors.description ? styles.inputError : null // Fix: Proper conditional styling
-          ]}
-          placeholder="Enter course description"
+          style={[styles.textAreaInput, errors.description ? styles.inputError : null]}
+          placeholder="Masukkan deskripsi course"
           placeholderTextColor={colors.textSecondary}
           value={formData.description}
-          onChangeText={(text) => {
-            setFormData(prev => ({ ...prev, description: text }));
-            if (errors.description) setErrors(prev => ({ ...prev, description: undefined }));
-          }}
+          onChangeText={(text) => handleInputChange('description', text)}
           multiline
           numberOfLines={4}
           textAlignVertical="top"
@@ -288,20 +339,19 @@ export default function MakeCourseForm({ onSuccess, onCancel }: MakeCourseFormPr
         />
         {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
         <Text style={styles.characterCount}>
-          {formData.description.length}/500 characters
+          {formData.description.length}/500 karakter
         </Text>
       </View>
 
       {/* Thumbnail Image */}
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Course Thumbnail</Text>
-        
+        <Text style={styles.label}>Thumbnail Course</Text>
         {formData.thumbnail_url ? (
           <View style={styles.imageContainer}>
             <Image source={{ uri: formData.thumbnail_url }} style={styles.thumbnailImage} />
             <TouchableOpacity
               style={styles.removeImageButton}
-              onPress={() => setFormData(prev => ({ ...prev, thumbnail_url: null }))}
+              onPress={() => handleInputChange('thumbnail_url', null)}
             >
               <X size={20} color={colors.background} />
             </TouchableOpacity>
@@ -313,11 +363,12 @@ export default function MakeCourseForm({ onSuccess, onCancel }: MakeCourseFormPr
             ) : (
               <>
                 <Camera size={24} color={colors.textSecondary} />
-                <Text style={styles.imageUploadText}>Add Thumbnail</Text>
+                <Text style={styles.imageUploadText}>Tambah Thumbnail</Text>
               </>
             )}
           </TouchableOpacity>
         )}
+        {errors.thumbnail_url && <Text style={styles.errorText}>{errors.thumbnail_url}</Text>}
       </View>
 
       {/* Action Buttons */}
@@ -325,12 +376,12 @@ export default function MakeCourseForm({ onSuccess, onCancel }: MakeCourseFormPr
         <TouchableOpacity
           style={[styles.button, styles.submitButton]}
           onPress={handleSubmit}
-          disabled={loading}
+          disabled={loading || imageLoading}
         >
           {loading ? (
             <ActivityIndicator size="small" color={colors.background} />
           ) : (
-            <Text style={styles.submitButtonText}>Create Course</Text>
+            <Text style={styles.submitButtonText}>{isEditMode ? 'Update Course' : 'Buat Course'}</Text>
           )}
         </TouchableOpacity>
 
@@ -338,9 +389,9 @@ export default function MakeCourseForm({ onSuccess, onCancel }: MakeCourseFormPr
           <TouchableOpacity
             style={[styles.button, styles.cancelButtonBottom]}
             onPress={onCancel}
-            disabled={loading}
+            disabled={loading || imageLoading}
           >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <Text style={styles.cancelButtonText}>Batal</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -348,6 +399,7 @@ export default function MakeCourseForm({ onSuccess, onCancel }: MakeCourseFormPr
   );
 }
 
+// Pastikan path ke Colors.ts benar
 const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
   StyleSheet.create({
     container: {
@@ -358,68 +410,72 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: 16,
+      paddingHorizontal: 16,
+      paddingVertical: Platform.OS === 'ios' ? 12 : 16, // Sedikit perbedaan padding untuk iOS
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
     title: {
       fontFamily: 'Inter-Bold',
-      fontSize: 24,
+      fontSize: 22, // Sedikit lebih kecil agar pas
       color: colors.textPrimary,
     },
     cancelButton: {
-      padding: 8,
+      padding: 8, // Area sentuh yang cukup
     },
     inputGroup: {
-      marginBottom: 24,
+      marginBottom: 20, // Jarak antar grup input
       paddingHorizontal: 16,
     },
     label: {
       fontFamily: 'Inter-SemiBold',
-      fontSize: 16,
+      fontSize: 15, // Sedikit lebih kecil
       color: colors.textPrimary,
       marginBottom: 8,
     },
     textInput: {
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 12,
-      padding: 16,
+      borderRadius: 10, // Sedikit lebih bulat
+      paddingHorizontal: 16,
+      paddingVertical: Platform.OS === 'ios' ? 14 : 12, // Penyesuaian padding vertikal
       fontFamily: 'Inter-Regular',
       fontSize: 16,
       color: colors.textPrimary,
-      backgroundColor: colors.card,
+      backgroundColor: colors.card, // Warna latar input
     },
     textAreaInput: {
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 12,
+      borderRadius: 10,
       padding: 16,
       fontFamily: 'Inter-Regular',
       fontSize: 16,
       color: colors.textPrimary,
       backgroundColor: colors.card,
-      minHeight: 120,
+      minHeight: 100, // Tinggi minimal untuk text area
+      textAlignVertical: 'top', // Mulai teks dari atas
     },
     pickerContainer: {
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 12,
+      borderRadius: 10,
       backgroundColor: colors.card,
-      overflow: 'hidden',
+      overflow: 'hidden', // Untuk memastikan border radius bekerja
     },
     picker: {
-      height: 50,
+      height: Platform.OS === 'ios' ? undefined : 50, // Di iOS, tinggi diatur oleh itemStyle
       color: colors.textPrimary,
+      paddingHorizontal: Platform.OS === 'android' ? 8 : 0, // Padding untuk Android
     },
     inputError: {
-      borderColor: colors.error,
+      borderColor: colors.error, // Warna border saat error
     },
     errorText: {
       fontFamily: 'Inter-Medium',
-      fontSize: 14,
+      fontSize: 13, // Sedikit lebih kecil
       color: colors.error,
-      marginTop: 4,
+      marginTop: 6, // Jarak dari input
     },
     characterCount: {
       fontFamily: 'Inter-Regular',
@@ -430,64 +486,75 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
     },
     imageContainer: {
       position: 'relative',
-      alignSelf: 'flex-start',
+      alignSelf: 'flex-start', // Agar tidak memenuhi lebar
+      marginTop: 8,
     },
     thumbnailImage: {
-      width: 200,
-      height: 120,
-      borderRadius: 12,
+      width: Platform.OS === 'web' ? 250 : 200, // Ukuran berbeda untuk web
+      height: Platform.OS === 'web' ? 140 : 112,
+      borderRadius: 10,
       resizeMode: 'cover',
+      backgroundColor: colors.border, // Placeholder color
     },
     removeImageButton: {
       position: 'absolute',
-      top: 8,
-      right: 8,
-      backgroundColor: colors.error,
-      borderRadius: 12,
-      padding: 4,
+      top: -8, // Sedikit keluar dari gambar
+      right: -8,
+      backgroundColor: colors.error, // Warna tombol hapus
+      borderRadius: 15, // Bulat
+      padding: 6, // Padding dalam tombol
+      elevation: 2, // Shadow untuk Android
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.2,
+      shadowRadius: 1,
     },
     imageUploadButton: {
       borderWidth: 2,
       borderColor: colors.border,
       borderStyle: 'dashed',
-      borderRadius: 12,
-      padding: 32,
+      borderRadius: 10,
+      paddingVertical: 30, // Padding vertikal lebih besar
+      paddingHorizontal: 20,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.backgroundSecondary,
+      backgroundColor: colors.backgroundSecondary, // Warna latar tombol upload
+      marginTop: 8,
     },
     imageUploadText: {
       fontFamily: 'Inter-Medium',
-      fontSize: 16,
+      fontSize: 15,
       color: colors.textSecondary,
-      marginTop: 8,
+      marginTop: 10, // Jarak dari ikon
     },
     buttonContainer: {
-      padding: 16,
-      paddingBottom: 32,
+      paddingHorizontal: 16,
+      paddingTop: 24, // Jarak dari elemen terakhir
+      paddingBottom: Platform.OS === 'ios' ? 40 : 32, // Padding bawah lebih besar untuk iOS (home indicator)
     },
     button: {
-      borderRadius: 12,
-      padding: 16,
+      borderRadius: 10,
+      paddingVertical: 15, // Padding vertikal tombol
       alignItems: 'center',
-      marginBottom: 12,
+      justifyContent: 'center',
+      marginBottom: 12, // Jarak antar tombol jika ada cancel
     },
     submitButton: {
-      backgroundColor: colors.primary,
+      backgroundColor: colors.primary, // Warna tombol submit
     },
     submitButtonText: {
       fontFamily: 'Inter-SemiBold',
       fontSize: 16,
-      color: colors.background,
+      color: colors.background, // Warna teks tombol submit
     },
     cancelButtonBottom: {
-      backgroundColor: colors.backgroundSecondary,
+      backgroundColor: 'transparent', // Tombol cancel transparan
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.border, // Border untuk tombol cancel
     },
     cancelButtonText: {
       fontFamily: 'Inter-SemiBold',
       fontSize: 16,
-      color: colors.textSecondary,
+      color: colors.textSecondary, // Warna teks tombol cancel
     },
   });

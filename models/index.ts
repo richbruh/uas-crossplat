@@ -2,15 +2,15 @@ import type { Course } from './course';
 import type { Lesson } from './lesson';
 import type { Enrollment } from './enrollment';
 import type { profile } from './profile';
-import type { Progress } from './progress';
+import type { Progress } from './Progress';
 
 export * from './profile';
 export * from './course';
 export * from './lesson';
 export * from './enrollment';
-export * from './progress';
-export * from './exam';
-export * from './submission';
+export * from './Progress';
+export * from './Exam';
+export * from './Submission';
 
 // You can also define relationships between models here if needed
 export interface CourseWithLessons extends Course {

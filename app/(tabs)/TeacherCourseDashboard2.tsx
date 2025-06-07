@@ -202,7 +202,10 @@ export default function TeacherCourseDashboard() {
 
   const handleViewCourse = (courseId: string) => {
     console.log(`[NAVIGATION] Navigating to course ${courseId}`);
-    router.push(`/courses/${courseId}`);
+    router.push({
+      pathname: '/course/[id]',  // Use existing route structure
+      params: { id: courseId }
+    });
   };
 
   useEffect(() => {
@@ -300,7 +303,7 @@ export default function TeacherCourseDashboard() {
   if (viewMode === 'edit' && editingCourse) {
     return (
       <MakeCourseForm
-        course={editingCourse}
+        initialCourseData={editingCourse}  // or whatever the correct prop name is
         onSuccess={handleCourseCreated}
         onCancel={() => {
           console.log('[COURSES] Course editing canceled');

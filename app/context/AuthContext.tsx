@@ -3,7 +3,6 @@ import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/app/utils/supabase';
 import { Alert } from 'react-native';
 
-// Define types for the auth context
 interface AuthContextType {
   session: Session | null;
   user: any;
@@ -14,7 +13,6 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<{ error: any }>;
 }
 
-// Create the initial context with default values
 const AuthContext = createContext<AuthContextType>({
   session: null,
   user: null,
@@ -25,27 +23,43 @@ const AuthContext = createContext<AuthContextType>({
   resetPassword: async () => ({ error: null }),
 });
 
-// Custom hook to use the auth context
 export const useAuth = () => {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    console.error('❌ useAuth must be used within AuthProvider');
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
 };
 
-// AuthProvider component to wrap the app with
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get session on initial load
+    console.log('🔧 AuthProvider initializing...');
+    
     const getSession = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error('Error getting session:', error.message);
+      try {
+        console.log('🔍 Getting initial session...');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        console.log('📱 Initial session result:', { session: !!session, error, userId: session?.user?.id });
+        
+        if (error) {
+          console.error('❌ Error getting session:', error.message);
+        }
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+        
+        console.log('✅ Session state updated:', { hasSession: !!session, hasUser: !!session?.user });
+      } catch (err) {
+        console.error('💥 Exception in getSession:', err);
+        setLoading(false);
       }
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
     };
 
     getSession();
@@ -53,38 +67,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(`Auth event: ${event}`);
+        console.log(`🔄 Auth event: ${event}`, { hasSession: !!session, userId: session?.user?.id });
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
       }
     );
 
-    // Clean up subscription
     return () => {
+      console.log('🧹 Cleaning up auth listener');
       authListener.subscription.unsubscribe();
     };
   }, []);
 
-  // Sign in with email and password
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('🔑 Attempting sign in for:', email);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (error) throw error;
+      console.log('✅ Sign in successful');
       return { error: null };
     } catch (error: any) {
-      console.error('Error signing in:', error.message);
+      console.error('❌ Error signing in:', error.message);
       return { error };
     }
   };
 
-  // Sign up with email and password
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
-      // Create auth user
+      console.log('📝 Attempting sign up for:', email);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -93,42 +107,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
 
       if (data.user) {
-        // Create profile in the profiles table
         const { error: profileError } = await supabase
           .from('profiles')
           .insert([
             {
               user_id: data.user.id,
               full_name: fullName,
-              role: 'student' // Default role
+              role: 'student'
             }
           ]);
 
         if (profileError) {
-          console.error('Error creating profile:', profileError.message);
-          // Consider handling this edge case (auth created but profile not)
+          console.error('❌ Error creating profile:', profileError.message);
         }
       }
 
+      console.log('✅ Sign up successful');
       return { error: null, data };
     } catch (error: any) {
-      console.error('Error signing up:', error.message);
+      console.error('❌ Error signing up:', error.message);
       return { error, data: null };
     }
   };
 
-  // Sign out
   const signOut = async () => {
     try {
+      console.log('🚪 Signing out...');
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      console.log('✅ Sign out successful');
     } catch (error: any) {
-      console.error('Error signing out:', error.message);
+      console.error('❌ Error signing out:', error.message);
       Alert.alert('Error signing out', error.message);
     }
   };
 
-  // Reset password
   const resetPassword = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -137,7 +150,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
       return { error: null };
     } catch (error: any) {
-      console.error('Error resetting password:', error.message);
+      console.error('❌ Error resetting password:', error.message);
       return { error };
     }
   };
@@ -151,6 +164,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signOut,
     resetPassword,
   };
+
+  console.log('🎯 AuthContext value:', { 
+    hasSession: !!session, 
+    hasUser: !!user, 
+    loading, 
+    userId: user?.id 
+  });
 
   return (
     <AuthContext.Provider value={value}>

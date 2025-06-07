@@ -66,10 +66,10 @@ const handleLogin = async () => {
       console.log('[Login] Redirecting based on role:', profile.role);
       switch(profile.role) {
         case 'admin':
-          router.replace('/(tabsAdmin)');
+          router.replace('/(tabs)');
           break;
         case 'teacher':
-          router.replace('/(tabsTeacher)');
+          router.replace('/(tabs)');
           break;
         default: // student or any other role
           router.replace('/(tabs)');

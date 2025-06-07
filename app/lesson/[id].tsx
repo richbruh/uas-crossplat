@@ -1,161 +1,239 @@
-//lesson/[id].tsx
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, Platform, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, Platform, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react-native';
-import { Video } from 'expo-av';
-import { useRef } from 'react';
-import { getLessonById, getCourseById, getLessonsByCourseId } from '@/data/courses';
+import { X, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../utils/supabase';
+import { Lesson, Course, Enrollment } from '@/models';
 
 export default function LessonScreen() {
   const { colors } = useTheme();
+  const { session } = useAuth();
   const styles = getStyles(colors);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const videoRef = useRef<Video>(null);
-  const [status, setStatus] = useState({});
-  
-  const lesson = getLessonById(id);
-  
-  if (!lesson) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text>Lesson not found</Text>
-      </View>
-    );
+
+  const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [course, setCourse] = useState<Course | null>(null);
+  const [courseLessons, setCourseLessons] = useState<Lesson[]>([]);
+  const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [completing, setCompleting] = useState(false);
+
+  useEffect(() => {
+    fetchLessonData();
+  }, [id]);
+
+  const fetchLessonData = async ( ) => {
+    if(!session?.user) {
+      Alert.alert('Error', 'You must be logged in to view lessons.');
+      router.back();
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Fetch Lesson by ID
+      const { data: lessonData, error: lessonError} = await supabase
+        .from('lessons')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (lessonError) throw lessonError;
+      setLesson(lessonData);
+
+      // Fetch Course for Lesson
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', lessonData.course_id)
+        .single();
+
+        if (courseError) throw courseError;
+        setCourse(courseData);
+
+      // Check enrollment
+      const { data: enrollmentData, error: enrollmentError } = await supabase
+        .from('enrollments')
+        .select('*')
+        .eq('course_id', lessonData.course_id)
+        .eq('student_id', session.user.id)
+        .single();
+
+      if (enrollmentError && enrollmentError.code !== 'PGRST116') {
+        throw enrollmentError;
+      }
+
+      if (!enrollmentData) {
+        Alert.alert('Access Denied', 'You must be enrolled in this course to access lessons.');
+        router.back();
+        return;
+      }
+
+      setEnrollment(enrollmentData);
+
+      // Fetch all course lessons
+      const { data: lessonsData, error: lessonsError } = await supabase
+        .from('lessons')
+        .select('*')
+        .eq('course_id', lessonData.course_id)
+        .order('lesson_order', { ascending: true });
+
+      if (lessonsError) throw lessonsError;
+      setCourseLessons(lessonsData || []);
+
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+      router.back();
+    } finally {
+      setLoading(false);
+    }
   }
-  
-  const course = getCourseById(lesson.courseId);
-  const courseLessons = getLessonsByCourseId(lesson.courseId);
-  
-  const lessonIndex = courseLessons.findIndex(l => l.id === lesson.id);
-  const prevLesson = lessonIndex > 0 ? courseLessons[lessonIndex - 1] : null;
-  const nextLesson = lessonIndex < courseLessons.length - 1 ? courseLessons[lessonIndex + 1] : null;
-  
-  const closeLesson = () => {
-    router.back();
+
+  const handleCompleteLesson = async () => {
+    if (!lesson || !enrollment) return;
+
+    setCompleting(true);
+    try {
+      // Update progress
+      const newCompletedLessons = enrollment.completed_lessons + 1;
+      const progressPercentage = Math.round((newCompletedLessons / courseLessons.length) * 100);
+
+      const { error } = await supabase
+        .from('enrollments')
+        .update({
+          completed_lessons: newCompletedLessons,
+          progress_percentage: progressPercentage
+        })
+        .eq('id', enrollment.id);
+
+      if (error) throw error;
+
+      Alert.alert('Lesson Completed! 🎉', 'Great job! You can now move to the next lesson.');
+      
+      // Update local state
+      setEnrollment(prev => prev ? {
+        ...prev,
+        completed_lessons: newCompletedLessons,
+        progress_percentage: progressPercentage
+      } : null);
+
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setCompleting(false);
+    }
   };
 
-  const navigateToLesson = (lessonId: string) => {
-    router.replace(`/lesson/${lessonId}`);
-  };
+ // Replace the render logic after loading check:
 
+if (loading) {
   return (
-    <>
-      <Stack.Screen 
-        options={{ 
-          headerShown: false,
-          animation: 'slide_from_bottom',
-        }} 
-      />
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={closeLesson} style={styles.closeButton}>
-            <X size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {course?.title}
-          </Text>
-          <View style={styles.placeholder} />
-        </View>
+    <View style={styles.centerContainer}>
+      <ActivityIndicator size="large" color={colors.primary} />
+    </View>
+  );
+}
 
-        {lesson.type === 'video' && (
-          <View style={styles.videoContainer}>
-            <Video
-              ref={videoRef}
-              style={styles.video}
-              source={{ uri: 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4' }} // Placeholder video URL
-              useNativeControls
-              resizeMode="cover"
-              isLooping
-              onPlaybackStatusUpdate={status => setStatus(status)}
-            />
-          </View>
-        )}
+if (!lesson || !course) {  // ✅ Check both lesson AND course
+  return (
+    <View style={styles.centerContainer}>
+      <Text style={styles.errorText}>Lesson not found</Text>
+      <TouchableOpacity 
+        style={styles.backButton} 
+        onPress={() => router.back()}
+      >
+        <Text style={styles.backButtonText}>Go Back</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
-        <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-          <View style={styles.lessonInfo}>
-            <Text style={styles.lessonTitle}>{lesson.title}</Text>
-            <Text style={styles.lessonDuration}>{lesson.duration}</Text>
-          </View>
-          
-          {lesson.type === 'quiz' ? (
-            <View style={styles.quizContainer}>
-              <Text style={styles.quizTitle}>Module Assessment</Text>
-              <Text style={styles.quizDescription}>
-                Test your knowledge with this quiz about the material covered in this module.
-              </Text>
-              
-              <View style={styles.questionContainer}>
-                <Text style={styles.questionText}>What is the main advantage of using React Native?</Text>
-                
-                <TouchableOpacity style={styles.answerOption}>
-                  <Text style={styles.answerText}>Native performance</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={[styles.answerOption, styles.selectedAnswer]}>
-                  <Text style={[styles.answerText, styles.selectedAnswerText]}>Cross-platform development</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.answerOption}>
-                  <Text style={styles.answerText}>Native UI components</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.answerOption}>
-                  <Text style={styles.answerText}>All of the above</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <TouchableOpacity style={styles.submitButton}>
-                <Text style={styles.submitButtonText}>Submit Answer</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.lessonContent}>
-              <Text style={styles.contentText}>
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-              </Text>
-              <Text style={styles.contentText}>
-                Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-              </Text>
-              <Text style={styles.contentText}>
-                Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.
-              </Text>
+// ✅ Now we're guaranteed course is not null below this point
+const lessonIndex = courseLessons.findIndex(l => l.id === lesson.id);
+const prevLesson = lessonIndex > 0 ? courseLessons[lessonIndex - 1] : null;
+const nextLesson = lessonIndex < courseLessons.length - 1 ? courseLessons[lessonIndex + 1] : null;
+
+// ✅ Safe boolean calculation
+const isCompleted = enrollment !== null && enrollment.completed_lessons >= lesson.lesson_order;
+
+return (
+  <>
+    <Stack.Screen 
+      options={{ 
+        headerShown: false,
+        animation: 'slide_from_bottom',
+      }} 
+    />
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+          <X size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {course.title}  {/* ✅ Safe: course is guaranteed not null */}
+        </Text>
+        <View style={styles.placeholder} />
+      </View>
+
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.lessonInfo}>
+          <Text style={styles.lessonTitle}>{lesson.title}</Text>
+          <Text style={styles.lessonOrder}>Lesson #{lesson.lesson_order}</Text>
+          {isCompleted && (
+            <View style={styles.completedBadge}>
+              <CheckCircle size={16} color="#10B981" />
+              <Text style={styles.completedText}>Completed</Text>
             </View>
           )}
-        </ScrollView>
-        
-        <View style={styles.navigationContainer}>
-          <TouchableOpacity 
-            style={[styles.navButton, !prevLesson && styles.disabledButton]} 
-            disabled={!prevLesson}
-            onPress={() => prevLesson && navigateToLesson(prevLesson.id)}
-          >
-            <ChevronLeft size={20} color={prevLesson ? colors.primary : colors.textTertiary} />
-            <Text style={[styles.navButtonText, !prevLesson && styles.disabledButtonText]}>Previous</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.completeButton, lesson.completed && styles.completedButton]}
-          >
-            <Text style={[styles.completeButtonText, lesson.completed && styles.completedButtonText]}>
-              {lesson.completed ? 'Completed' : 'Mark Complete'}
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.navButton, !nextLesson && styles.disabledButton]} 
-            disabled={!nextLesson}
-            onPress={() => nextLesson && navigateToLesson(nextLesson.id)}
-          >
-            <Text style={[styles.navButtonText, !nextLesson && styles.disabledButtonText]}>Next</Text>
-            <ChevronRight size={20} color={nextLesson ? colors.primary : colors.textTertiary} />
-          </TouchableOpacity>
         </View>
-      </SafeAreaView>
-    </>
-  );
+        
+        <View style={styles.lessonContent}>
+          <Text style={styles.contentText}>
+            {lesson.content || 'No content available.'}
+          </Text>
+        </View>
+      </ScrollView>
+      
+      <View style={styles.navigationContainer}>
+        <TouchableOpacity 
+          style={[styles.navButton, !prevLesson && styles.disabledButton]} 
+          disabled={!prevLesson}  // ✅ boolean | undefined (correct)
+          onPress={() => prevLesson && router.replace(`/lesson/${prevLesson.id}`)}
+        >
+          <ChevronLeft size={20} color={prevLesson ? colors.primary : colors.textTertiary} />
+          <Text style={[styles.navButtonText, !prevLesson && styles.disabledButtonText]}>Previous</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.completeButton, isCompleted && styles.completedButton]}
+          disabled={completing || isCompleted}  // ✅ boolean (correct)
+          onPress={handleCompleteLesson}
+        >
+          {completing ? (
+            <ActivityIndicator size="small" color={colors.background} />
+          ) : (
+            <Text style={[styles.completeButtonText, isCompleted && styles.completedButtonText]}>
+              {isCompleted ? '✓ Completed' : 'Complete'}
+            </Text>
+          )}
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.navButton, !nextLesson && styles.disabledButton]} 
+          disabled={!nextLesson}  // ✅ boolean | undefined (correct)
+          onPress={() => nextLesson && router.replace(`/lesson/${nextLesson.id}`)}
+        >
+          <Text style={[styles.navButtonText, !nextLesson && styles.disabledButtonText]}>Next</Text>
+          <ChevronRight size={20} color={nextLesson ? colors.primary : colors.textTertiary} />
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  </>
+);
 }
 
 const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
@@ -196,15 +274,6 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
   placeholder: {
     width: 40,
   },
-  videoContainer: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    backgroundColor: '#000',
-  },
-  video: {
-    width: '100%',
-    height: '100%',
-  },
   content: {
     flex: 1,
   },
@@ -221,10 +290,17 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
     color: colors.textPrimary,
     marginBottom: 8,
   },
-  lessonDuration: {
+  lessonOrder: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
     color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  lessonDate: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 12,
+    color: colors.textTertiary,
+    marginBottom: 4,
   },
   lessonContent: {
     marginBottom: 32,
@@ -235,66 +311,6 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
     color: colors.textPrimary,
     lineHeight: 24,
     marginBottom: 16,
-  },
-  quizContainer: {
-    padding: 16,
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 16,
-    marginBottom: 32,
-  },
-  quizTitle: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
-    color: colors.textPrimary,
-    marginBottom: 8,
-  },
-  quizDescription: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  questionContainer: {
-    marginBottom: 24,
-  },
-  questionText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    color: colors.textPrimary,
-    marginBottom: 16,
-  },
-  answerOption: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    marginBottom: 12,
-    backgroundColor: colors.background,
-  },
-  selectedAnswer: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight + '20',
-  },
-  answerText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    color: colors.textPrimary,
-  },
-  selectedAnswerText: {
-    fontFamily: 'Inter-Medium',
-    color: colors.primary,
-  },
-  submitButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  submitButtonText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
-    color: colors.background,
   },
   navigationContainer: {
     flexDirection: 'row',
@@ -322,22 +338,57 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
   },
   disabledButtonText: {
     color: colors.textTertiary,
+  },completedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981' + '20',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+  },
+  completedText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 12,
+    color: '#10B981',
+    marginLeft: 4,
   },
   completeButton: {
-    backgroundColor: colors.success,
+    backgroundColor: colors.primary,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 20,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  completedButton: {
+    backgroundColor: '#10B981',
   },
   completeButtonText: {
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'Inter-Medium',
     fontSize: 14,
     color: colors.background,
   },
-  completedButton: {
-    backgroundColor: colors.backgroundSecondary,
-  },
   completedButtonText: {
-    color: colors.textSecondary,
+    color: colors.background,
   },
+  errorText: {
+      fontFamily: 'Inter-Regular',
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: 16,
+    },
+    backButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 8,
+    },
+    backButtonText: {
+      fontFamily: 'Inter-Medium',
+      fontSize: 14,
+      color: colors.background,
+    }
 });
