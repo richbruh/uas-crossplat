@@ -64,7 +64,7 @@ interface TeacherSectionProps {
 
 
 // Replace the existing TeacherSection component
-const TeacherSection = ({ profile, colors, onNavigateToTeacher }: TeacherSectionProps) => {
+const TeacherSection = ({ profile, colors, onNavigateToTeacher, onNavigateToAdmin }: TeacherSectionProps) => {
   // Show for both teacher and admin roles
   if (profile?.role !== 'teacher' && profile?.role !== 'admin') return null;
 
@@ -97,11 +97,11 @@ const TeacherSection = ({ profile, colors, onNavigateToTeacher }: TeacherSection
           </View>
         </TouchableOpacity>
 
-        {/* Admin-Only Navigation */}
+        {/* ✅ FIXED: Admin-Only Navigation */}
         {profile?.role === 'admin' && (
           <TouchableOpacity 
             style={[styles(colors).teacherButton, { marginTop: 12 }]}
-            onPress={() => {/* Add admin navigation */}}
+            onPress={onNavigateToAdmin} // ✅ Use the correct prop
           >
             <View style={styles(colors).teacherButtonContent}>
               <View style={[styles(colors).teacherIcon, { backgroundColor: colors.error + '20' }]}>
@@ -352,8 +352,14 @@ export default function ProfileScreen() {
   };
 
   const navigateToAdminDashboard = () => {
-  router.push('/admin/admin'); // Based on your folder structure
-};
+    console.log('[PROFILE] Navigating to admin dashboard...');
+    try {
+      router.push('/admin/admin'); // Navigate to admin.tsx
+    } catch (error) {
+      console.error('[PROFILE] Error navigating to admin:', error);
+      Alert.alert('Navigation Error', 'Failed to open admin dashboard. Please try again.');
+    }
+  };
 
   // Profile update handler
   const handleProfileUpdate = (updatedProfile: ProfileType) => {

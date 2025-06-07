@@ -33,7 +33,10 @@ const Admin = () => {
   const { user } = useAuth();
   const router = useRouter();
 
-  console.log('[Admin] Component mounted. Current user:', user);
+  console.log('[Admin] Component mounted');
+  console.log('[Admin] Current user:', user);
+  console.log('[Admin] User role:', user?.role);
+  console.log('[Admin] User ID:', user?.id);
 
   // State management
   const [state, setState] = useState({
@@ -52,15 +55,15 @@ const Admin = () => {
   console.log('[Admin] Current state:', state);
 
   // Verify admin status on mount
-  useEffect(() => {
-    console.log('[Admin] Checking user role...');
-    if (user?.role !== 'admin') {
-      console.warn('[Admin] Unauthorized access to admin panel. User role:', user?.role);
-      router.replace('/(tabs)');
-    } else {
-      console.log('[Admin] User has admin access');
-    }
-  }, [user]);
+    useEffect(() => {
+      console.log('[Admin] Checking user authentication...');
+    
+      if (user?.role !== 'admin') {
+        console.warn('[Admin] User role is not admin:', user?.role);
+      } else {
+        console.log('[Admin] User has admin access');
+      }
+    }, [user]);
 
   // Fetch data with error boundaries
   const fetchData = useCallback(async (page = 1, refresh = false) => {

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { supabase } from '@/app/utils/supabase';
 
-export default function TeacherLayout() {
+export default function AdminLayout() {
   const { session, loading: authLoading } = useAuth();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,29 +51,21 @@ export default function TeacherLayout() {
     return <Redirect href="/(tabs)" />;
   }
 
-  // ✅ Teacher-only navigation
+  // ✅ Admin-only navigation
   return (
     <Stack>
       <Stack.Screen 
-        name="dashboard" 
+        name="admin" 
         options={{ 
-          title: 'Teacher Dashboard',
+          title: 'Admin Dashboard',
           headerShown: false,
-           
         }} 
       />
       <Stack.Screen 
-        name="manage-lessons" 
+        name="admin2" 
         options={{ 
-          title: 'Manage Lessons',
-          headerShown: true 
-        }} 
-      />
-      <Stack.Screen 
-        name="manage-exam" 
-        options={{ 
-          title: 'Manage Exam',
-          headerShown: true 
+          title: 'Admin Panel v2',
+          headerShown: false,
         }} 
       />
     </Stack>

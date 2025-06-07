@@ -17,7 +17,8 @@ import { Camera, X } from 'lucide-react-native';
 import { useTheme } from '../app/context/ThemeContext'; // Pastikan path ini benar
 import { useAuth } from '../app/context/AuthContext';   // Pastikan path ini benar
 import { supabase } from '@/app/utils/supabase';      // Pastikan path ini benar
-import { Course } from '@/models/course';           // Pastikan path ini benar
+import { Course } from '@/models/course';  
+
 
 export interface MakeCourseFormProps {
   initialCourseData?: Course | null; // Untuk mode edit
@@ -30,14 +31,15 @@ interface CourseFormData {
   grade_level: number;
   description: string;
   thumbnail_url: string | null;
-  total_lessons: number;
+  //total_lessons: number;
 }
+
 
 interface FormErrors {
   title?: string;
   grade_level?: string;
   description?: string;
-  total_lessons?: string;
+  //total_lessons?: string;
   thumbnail_url?: string;
 }
 
@@ -57,10 +59,10 @@ export default function MakeCourseForm({
 
   const [formData, setFormData] = useState<CourseFormData>({
     title: '',
-    grade_level: GRADE_LEVELS[0], // Default ke grade pertama
+    grade_level: GRADE_LEVELS[0],
     description: '',
     thumbnail_url: null,
-    total_lessons: 1
+    // ❌ REMOVED: total_lessons: 1
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
@@ -73,16 +75,16 @@ export default function MakeCourseForm({
         grade_level: initialCourseData.grade_level || GRADE_LEVELS[0],
         description: initialCourseData.description || '',
         thumbnail_url: initialCourseData.thumbnail_url || null,
-        total_lessons: initialCourseData.total_lessons || 1,
+        // ❌ REMOVED: total_lessons: initialCourseData.total_lessons || 1,
       });
     } else {
-      // Reset form untuk mode create jika diperlukan (atau biarkan default dari useState)
+      // Reset form untuk mode create
       setFormData({
         title: '',
         grade_level: GRADE_LEVELS[0],
         description: '',
         thumbnail_url: null,
-        total_lessons: 1,
+        // ❌ REMOVED: total_lessons: 1,
       });
     }
   }, [initialCourseData, isEditMode]);
@@ -96,29 +98,25 @@ export default function MakeCourseForm({
   };
 
   const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
+  const newErrors: FormErrors = {};
 
-    if (!formData.title.trim()) {
-      newErrors.title = 'Judul course tidak boleh kosong';
-    } else if (formData.title.length < 3) {
-      newErrors.title = 'Judul course minimal 3 karakter';
-    }
+  if (!formData.title.trim()) {
+    newErrors.title = 'Judul course tidak boleh kosong';
+  } else if (formData.title.length < 3) {
+    newErrors.title = 'Judul course minimal 3 karakter';
+  }
 
-    if (!formData.description.trim()) {
-      newErrors.description = 'Deskripsi course tidak boleh kosong';
-    } else if (formData.description.length < 10) {
-      newErrors.description = 'Deskripsi minimal 10 karakter';
-    }
+  if (!formData.description.trim()) {
+    newErrors.description = 'Deskripsi course tidak boleh kosong';
+  } else if (formData.description.length < 10) {
+    newErrors.description = 'Deskripsi minimal 10 karakter';
+  }
 
-    if (formData.total_lessons < 1) {
-      newErrors.total_lessons = 'Minimal harus ada 1 lesson';
-    } else if (formData.total_lessons > 100) {
-      newErrors.total_lessons = 'Tidak boleh melebihi 100 lesson';
-    }
+  // ❌ REMOVED: total_lessons validation
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
 
   const selectImage = async () => {
     try {
@@ -153,109 +151,80 @@ export default function MakeCourseForm({
     }
   };
 
-  // Fungsi placeholder untuk upload ke Supabase Storage (perlu diimplementasikan)
-  // async function uploadImageToSupabase(uri: string): Promise<string | null> {
-  //   if (!session?.user) return null;
-  //   const fileExt = uri.split('.').pop();
-  //   const fileName = `${Date.now()}.${fileExt}`;
-  //   const filePath = `${session.user.id}/${fileName}`;
+const handleSubmit = async () => {
+  if (!session?.user) {
+    Alert.alert('Error', 'Anda harus login untuk melanjutkan');
+    return;
+  }
 
-  //   // Convert URI ke Blob
-  //   const response = await fetch(uri);
-  //   const blob = await response.blob();
+  if (!validateForm()) {
+    return;
+  }
 
-  //   const { data, error } = await supabase.storage
-  //     .from('thumbnails') // Ganti 'thumbnails' dengan nama bucket Anda
-  //     .upload(filePath, blob, {
-  //       cacheControl: '3600',
-  //       upsert: false,
-  //       contentType: blob.type, // Pastikan contentType benar
-  //     });
+  setLoading(true);
+  try {
+    // ✅ UPDATED: Remove total_lessons from payload, will be auto-calculated
+    const coursePayload = {
+      title: formData.title.trim(),
+      grade_level: formData.grade_level,
+      description: formData.description.trim(),
+      thumbnail_url: formData.thumbnail_url,
+      teacher_id: session.user.id,
+      // ❌ REMOVED: total_lessons: formData.total_lessons,
+      // ✅ NEW: Set default total_lessons as 0, will be updated when lessons are added
+      total_lessons: 0,
+    };
 
-  //   if (error) {
-  //     console.error('Error uploading image to Supabase:', error);
-  //     Alert.alert('Error', 'Gagal mengupload gambar.');
-  //     return null;
-  //   }
+    let resultCourse: Course | null = null;
 
-  //   // Dapatkan URL publik dari gambar yang diupload
-  //   const { data: publicUrlData } = supabase.storage
-  //     .from('thumbnails')
-  //     .getPublicUrl(filePath);
-
-  //   return publicUrlData?.publicUrl || null;
-  // }
-
-
-  const handleSubmit = async () => {
-    if (!session?.user) {
-      Alert.alert('Error', 'Anda harus login untuk melanjutkan');
-      return;
+    if (isEditMode && initialCourseData?.id) {
+      // ✅ UPDATED: For edit mode, don't update total_lessons (preserve current count)
+      const { total_lessons, ...updatePayload } = coursePayload;
+      
+      const { data, error } = await supabase
+        .from('courses')
+        .update(updatePayload) // Don't update total_lessons in edit mode
+        .eq('id', initialCourseData.id)
+        .select()
+        .single();
+      if (error) throw error;
+      resultCourse = data as Course;
+      Alert.alert('Sukses', 'Course berhasil diperbarui!');
+    } else {
+      // Create new course with total_lessons = 0
+      const { data, error } = await supabase
+        .from('courses')
+        .insert([coursePayload])
+        .select()
+        .single();
+      if (error) throw error;
+      resultCourse = data as Course;
+      Alert.alert('Sukses', 'Course berhasil dibuat! Anda dapat menambahkan lesson sekarang.');
     }
 
-    if (!validateForm()) {
-      return;
+    if (onSuccess && resultCourse) {
+      onSuccess(resultCourse);
     }
 
-    setLoading(true);
-    try {
-      const coursePayload = {
-        title: formData.title.trim(),
-        grade_level: formData.grade_level,
-        description: formData.description.trim(),
-        thumbnail_url: formData.thumbnail_url, // Ini bisa URI lokal atau URL Supabase Storage
-        teacher_id: session.user.id,
-        total_lessons: formData.total_lessons,
-      };
-
-      let resultCourse: Course | null = null;
-
-      if (isEditMode && initialCourseData?.id) {
-        // Update existing course
-        const { data, error } = await supabase
-          .from('courses')
-          .update(coursePayload)
-          .eq('id', initialCourseData.id)
-          .select()
-          .single();
-        if (error) throw error;
-        resultCourse = data as Course;
-        Alert.alert('Sukses', 'Course berhasil diperbarui!');
-      } else {
-        // Create new course
-        const { data, error } = await supabase
-          .from('courses')
-          .insert([coursePayload])
-          .select()
-          .single();
-        if (error) throw error;
-        resultCourse = data as Course;
-        Alert.alert('Sukses', 'Course berhasil dibuat!');
-      }
-
-      if (onSuccess && resultCourse) {
-        onSuccess(resultCourse);
-      }
-
-      // Reset form hanya jika bukan mode edit atau jika sukses dan ingin form bersih
-      if (!isEditMode) {
-        setFormData({
-          title: '',
-          grade_level: GRADE_LEVELS[0],
-          description: '',
-          thumbnail_url: null,
-          total_lessons: 1,
-        });
-        setErrors({});
-      }
-
-    } catch (error: any) {
-      console.error(`Error ${isEditMode ? 'updating' : 'creating'} course:`, error);
-      Alert.alert('Error', error.message || `Gagal ${isEditMode ? 'memperbarui' : 'membuat'} course`);
-    } finally {
-      setLoading(false);
+    // Reset form untuk create mode
+    if (!isEditMode) {
+      setFormData({
+        title: '',
+        grade_level: GRADE_LEVELS[0],
+        description: '',
+        thumbnail_url: null,
+        // ❌ REMOVED: total_lessons: 1,
+      });
+      setErrors({});
     }
-  };
+
+  } catch (error: any) {
+    console.error(`Error ${isEditMode ? 'updating' : 'creating'} course:`, error);
+    Alert.alert('Error', error.message || `Gagal ${isEditMode ? 'memperbarui' : 'membuat'} course`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -303,24 +272,6 @@ export default function MakeCourseForm({
             ))}
           </Picker>
         </View>
-      </View>
-
-      {/* Total Lessons */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Jumlah Lesson *</Text>
-        <TextInput
-          style={[styles.textInput, errors.total_lessons ? styles.inputError : null]}
-          placeholder="Jumlah lesson"
-          placeholderTextColor={colors.textSecondary}
-          value={formData.total_lessons.toString()}
-          onChangeText={(text) => {
-            const number = parseInt(text);
-            handleInputChange('total_lessons', isNaN(number) ? 1 : Math.max(1, number));
-          }}
-          keyboardType="numeric"
-          maxLength={3}
-        />
-        {errors.total_lessons && <Text style={styles.errorText}>{errors.total_lessons}</Text>}
       </View>
 
       {/* Description */}
