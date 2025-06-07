@@ -86,16 +86,18 @@ export default function TeacherCourseDashboard() {
       throw profileError;
     }
 
-      if (!profileData || profileData.role !== 'teacher') {
-        setError('Access Denied. This page is for teachers only.');
+      if (!profileData || (profileData.role !== 'teacher' && profileData.role !== 'admin')) {
+        setError('Access Denied: This page is for teachers and administrators only.');
         setUserProfile(profileData);
         setLoading(false);
         return;
       }
       setUserProfile(profileData);
-
+      const isAdmin = profileData.role === 'admin';
+      console.log(`[TEACHER_DASHBOARD] ${profileData.role} access granted for: ${profileData.full_name}`);
+      
       // 2. Fetch Courses for Current Teacher with Lesson and Exam Stats
-      const { data: coursesData, error: coursesError } = await supabase
+      let courseQuery = supabase
         .from('courses')
         .select(`
           *,
@@ -110,17 +112,27 @@ export default function TeacherCourseDashboard() {
             id
           )
         `)
-        .eq('teacher_id', session.user.id)
+        //.eq('teacher_id', session.user.id)
         .order('created_at', { ascending: false });
 
-      if (coursesError) {
-        console.error('[TEACHER_DASHBOARD] Courses fetch error:', coursesError);
-        throw coursesError;
-      }
+        // ✅ Admin sees ALL courses, Teacher sees only their own
+        if (!isAdmin) {
+          courseQuery = courseQuery.eq('teacher_id', session.user.id);
+          console.log('[TEACHER_DASHBOARD] Teacher mode: Fetching own courses only');
+        } else {
+          console.log('[TEACHER_DASHBOARD] Admin mode: Fetching ALL courses');
+        }
+        
+        const { data: coursesData, error: coursesError } = await courseQuery;
+
+        if (coursesError) {
+          console.error('[TEACHER_DASHBOARD] Courses fetch error:', coursesError);
+          throw coursesError;
+        }
 
       console.log('[TEACHER_DASHBOARD] Raw courses data:', coursesData?.length);
 
-  // 3. Process Courses with Enhanced Stats
+   // 3. Process Courses with Enhanced Stats
     const coursesWithFullStats: CourseWithStats[] = await Promise.all(
       (coursesData || []).map(async (course) => {
         console.log(`[TEACHER_DASHBOARD] Processing course: ${course.title}`);
@@ -135,20 +147,9 @@ export default function TeacherCourseDashboard() {
           console.error(`Error fetching enrollments for course ${course.id}:`, enrollmentError);
         }
 
-        // ✅ FIXED: Calculate lesson statistics (no is_published field)
+        // Calculate lesson statistics
         const lessons = course.lessons || [];
-        console.log(`[TEACHER_DASHBOARD] Course ${course.title} has ${lessons.length} lessons`);
-
-        // Since is_published doesn't exist, consider all lessons as published
-        // Alternative: filter by lesson_type or created_at
-        const publishedLessons = lessons.filter((lesson: any) => {
-          // For now, consider all lessons as "published"
-          return true;
-          
-          // Alternative options:
-          // return lesson.lesson_type !== 'draft';
-          // return new Date(lesson.created_at) < new Date(Date.now() - 24*60*60*1000); // 1 day old
-        });
+        const publishedLessons = lessons.filter(() => true); // All lessons considered published
 
         const totalDuration = lessons.reduce((sum: number, lesson: any) => 
           sum + (lesson.duration || 0), 0
@@ -175,14 +176,11 @@ export default function TeacherCourseDashboard() {
           published_lessons: publishedLessons.length,
           total_duration: totalDuration,
           exam_exists: (course.exams?.length || 0) > 0,
+          // ✅ NEW: Add teacher info for admin view
+          teacher_name: course.profiles?.full_name || 'Unknown Teacher',
+          teacher_id: course.teacher_id,
+          is_own_course: course.teacher_id === session.user.id,
         };
-
-        console.log(`[TEACHER_DASHBOARD] Course ${course.title} stats:`, {
-          lessons: courseStats.lesson_count,
-          published: courseStats.published_lessons,
-          students: courseStats.student_count,
-          duration: courseStats.total_duration
-        });
 
         return courseStats;
       })

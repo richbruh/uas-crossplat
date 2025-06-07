@@ -21,7 +21,27 @@ const handleLogin = async () => {
     console.log('[Login] Attempting login with:', { email });
     
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    
+    if (error) {
+      console.error('[Login] Authentication error:', error);
+      
+      // Handle specific error cases
+      switch (error.message) {
+        case 'Invalid login credentials':
+          Alert.alert('Login Failed', 'Invalid email or password. Please check your credentials and try again.');
+          return;
+        case 'Email not confirmed':
+          Alert.alert('Email Not Verified', 'Please check your email and click the verification link before logging in.');
+          return;
+        case 'Too many requests':
+          Alert.alert('Too Many Attempts', 'Too many login attempts. Please wait a moment before trying again.');
+          return;
+        default:
+          // Generic error message for other cases
+          Alert.alert('Login Failed', error.message || 'Unable to login. Please try again.');
+          return;
+      }
+    }
 
     console.log('[Login] Login successful, getting user data...');
     
@@ -39,7 +59,12 @@ const handleLogin = async () => {
         .eq('user_id', user.id)
         .single();
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('[Login] Profile fetch error:', profileError);
+        Alert.alert('Profile Error', 'Could not fetch user profile. Please contact support.');
+        return;
+      }
+      
       console.log('[Login] Retrieved profile:', JSON.stringify(profile, null, 2));
 
       // Clean up all role declarations
@@ -51,16 +76,6 @@ const handleLogin = async () => {
           identity_data: null 
         }
       });
-
-      // For admin-level correction (if needed)
-      console.log('[Login] Updating admin metadata if needed');
-      await supabase.auth.admin.updateUserById(user.id, {
-        user_metadata: { role: profile.role }
-      });
-
-      // Get updated session
-      const { data: { session: updatedSession } } = await supabase.auth.getSession();
-      console.log('[Login] Updated session after role update:', JSON.stringify(updatedSession, null, 2));
 
       // Redirect based on role
       console.log('[Login] Redirecting based on role:', profile.role);
@@ -80,8 +95,8 @@ const handleLogin = async () => {
     console.log('[Login] No user ID found, default redirect');
     router.replace('/(tabs)');
   } catch (error) {
-    console.error('[Login] Error:', error);
-    Alert.alert('Login Failed', error instanceof Error ? error.message : 'Could not verify user role');
+    console.error('[Login] Unexpected error:', error);
+    Alert.alert('Login Error', 'An unexpected error occurred. Please try again.');
   } finally {
     setLoading(false);
   }

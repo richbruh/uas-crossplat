@@ -46,10 +46,11 @@ export default function TeacherLayout() {
     );
   }
 
-  // ✅ SECURITY: Redirect students
-  if (!session?.user || (userRole !== 'teacher' && userRole !== 'admin')) {
+  // ✅ SECURITY: Redirect non-teachers
+  if (!session?.user || userRole !== 'teacher') {
     return <Redirect href="/(tabs)" />;
   }
+
   // ✅ Teacher-only navigation
   return (
     <Stack>

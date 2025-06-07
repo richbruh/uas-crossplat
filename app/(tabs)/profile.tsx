@@ -59,15 +59,23 @@ interface TeacherSectionProps {
   profile: ProfileType | null;
   colors: any;
   onNavigateToTeacher: () => void;
+  onNavigateToAdmin: () => void;
 }
 
+
+// Replace the existing TeacherSection component
 const TeacherSection = ({ profile, colors, onNavigateToTeacher }: TeacherSectionProps) => {
+  // Show for both teacher and admin roles
   if (profile?.role !== 'teacher' && profile?.role !== 'admin') return null;
 
   return (
     <Animated.View entering={FadeIn.delay(200).duration(500)}>
       <View style={styles(colors).teacherSection}>
-        <Text style={styles(colors).sectionTitle}>Teacher Tools</Text>
+        <Text style={styles(colors).sectionTitle}>
+          {profile?.role === 'admin' ? 'Management Tools' : 'Teacher Tools'}
+        </Text>
+        
+        {/* Teacher Dashboard Access */}
         <TouchableOpacity 
           style={styles(colors).teacherButton}
           onPress={onNavigateToTeacher}
@@ -78,11 +86,37 @@ const TeacherSection = ({ profile, colors, onNavigateToTeacher }: TeacherSection
             </View>
             <View style={styles(colors).teacherTextContainer}>
               <Text style={styles(colors).teacherButtonText}>Course Dashboard</Text>
-              <Text style={styles(colors).teacherButtonSubtext}>Manage your courses and lessons</Text>
+              <Text style={styles(colors).teacherButtonSubtext}>
+                {profile?.role === 'admin' 
+                  ? 'Manage all courses and content' 
+                  : 'Manage your courses and lessons'
+                }
+              </Text>
             </View>
             <ChevronRight size={20} color={colors.textSecondary} />
           </View>
         </TouchableOpacity>
+
+        {/* Admin-Only Navigation */}
+        {profile?.role === 'admin' && (
+          <TouchableOpacity 
+            style={[styles(colors).teacherButton, { marginTop: 12 }]}
+            onPress={() => {/* Add admin navigation */}}
+          >
+            <View style={styles(colors).teacherButtonContent}>
+              <View style={[styles(colors).teacherIcon, { backgroundColor: colors.error + '20' }]}>
+                <Award size={20} color={colors.error} />
+              </View>
+              <View style={styles(colors).teacherTextContainer}>
+                <Text style={styles(colors).teacherButtonText}>Admin Dashboard</Text>
+                <Text style={styles(colors).teacherButtonSubtext}>
+                  Manage users, system settings & analytics
+                </Text>
+              </View>
+              <ChevronRight size={20} color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+        )}
       </View>
     </Animated.View>
   );
@@ -317,6 +351,10 @@ export default function ProfileScreen() {
     router.push('/teacher/dashboard');
   };
 
+  const navigateToAdminDashboard = () => {
+  router.push('/admin/admin'); // Based on your folder structure
+};
+
   // Profile update handler
   const handleProfileUpdate = (updatedProfile: ProfileType) => {
     setProfile(updatedProfile);
@@ -372,6 +410,7 @@ export default function ProfileScreen() {
     );
   };
 
+  
   const openImagePicker = async (source: 'camera' | 'library') => {
     try {
       let result;
@@ -633,8 +672,8 @@ export default function ProfileScreen() {
             profile={profile} 
             colors={colors} 
             onNavigateToTeacher={navigateToTeacherDashboard}
+            onNavigateToAdmin={navigateToAdminDashboard}
           />
-          
           {/* Action Buttons */}
           <ActionButtons 
             colors={colors} 

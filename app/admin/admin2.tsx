@@ -1,5 +1,4 @@
-//bedanya admin2.tsx styling berbeda trus masih belum bisa terkhususkan untuk role admin
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -22,24 +21,19 @@ import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'expo-router';
-import { getRoleBadgeColor } from '@/models/profile';
+import { profile, getRoleBadgeColor } from '@/models/profile'; // ✅ Fixed import
 import { User, UserCheck, Shield, UserX, ChevronRight, MoreVertical, X } from 'lucide-react-native';
 
-interface Profile {
-  user_id: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  role: 'student' | 'teacher' | 'admin';
-  created_at: string;
-  email?: string;
-}
+// ✅ Fixed: Use proper Profile type
+type Profile = profile;
 
 export default function AdminPage() {
   const { colors } = useTheme();
-  const { session, user } = useAuth();
+  const { session, loading: authLoading } = useAuth(); // ✅ Fixed: Use session instead of user
   const router = useRouter();
   const styles = getStyles(colors);
 
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,15 +41,48 @@ export default function AdminPage() {
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-    useEffect(() => {
-    if (!user || user.role !== 'admin') {
-      setError('Access Denied: Admin privileges required');
-      setLoading(false);
-    } else {
-      fetchProfiles();
-    }
-  }, [user]);
+  // ✅ Fixed: Check user role properly
+  useEffect(() => {
+    async function checkUserRole() {
+      if (authLoading) return;
+      
+      if (!session?.user) {
+        setError('Access Denied: Please login to continue');
+        setLoading(false);
+        return;
+      }
 
+      try {
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (error) throw error;
+        
+        const role = profileData?.role;
+        setUserRole(role);
+        
+        if (role !== 'admin') {
+          setError('Access Denied: Admin privileges required');
+          setLoading(false);
+          return;
+        }
+        
+        // If admin, fetch profiles
+        fetchProfiles();
+      } catch (error) {
+        console.error('Error checking user role:', error);
+        setError('Failed to verify user permissions');
+        setLoading(false);
+      }
+    }
+
+    checkUserRole();
+  }, [session, authLoading]);
+
+  // ✅ Fixed: fetchProfiles function
   const fetchProfiles = useCallback(async () => {
     try {
       setLoading(true);
@@ -74,17 +101,15 @@ export default function AdminPage() {
       setError(err.message || 'Failed to load profiles');
     } finally {
       setLoading(false);
+      setRefreshing(false); // ✅ Fixed: Reset refreshing state
     }
   }, []);
 
-  useEffect(() => {
-    fetchProfiles();
-  }, [fetchProfiles]);
-
-  const handleRefresh = () => {
+  // ✅ Fixed: handleRefresh function
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
     fetchProfiles();
-  };
+  }, [fetchProfiles]);
 
   const openRoleEditor = (profile: Profile) => {
     setSelectedProfile(profile);
@@ -96,14 +121,15 @@ export default function AdminPage() {
     setSelectedProfile(null);
   };
 
+  // ✅ Fixed: updateUserRole function
   const updateUserRole = async (newRole: 'student' | 'teacher' | 'admin') => {
-    if (!selectedProfile) return;
+    if (!selectedProfile || !session?.user) return;
 
     try {
       setLoading(true);
       
       // Don't allow demoting yourself from admin
-      if (selectedProfile.user_id === user?.id && newRole !== 'admin') {
+      if (selectedProfile.user_id === session.user.id && newRole !== 'admin') {
         Alert.alert('Error', 'You cannot remove admin privileges from yourself');
         return;
       }
@@ -150,13 +176,14 @@ export default function AdminPage() {
     );
   };
 
+  // ✅ Fixed: renderProfileItem function
   const renderProfileItem = ({ item }: { item: Profile }) => (
-    <View style={styles.profileCard}>
+    <Animated.View entering={FadeIn} style={styles.profileCard}>
       <View style={styles.profileInfo}>
         {item.avatar_url ? (
           <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
         ) : (
-          <View style={[styles.avatar, { backgroundColor: colors.card }]}>
+          <View style={[styles.avatar, { backgroundColor: colors.backgroundSecondary }]}>
             <User size={24} color={colors.textSecondary} />
           </View>
         )}
@@ -173,17 +200,17 @@ export default function AdminPage() {
       <View style={styles.roleContainer}>
         <View style={[
           styles.roleBadge,
-          { backgroundColor: getRoleBadgeColor(item.role, colors) },
+          { backgroundColor: getRoleBadgeColor(item.role) },
         ]}>
-          {item.role === 'admin' && <Shield size={16} color={colors.background} />}
-          {item.role === 'teacher' && <UserCheck size={16} color={colors.background} />}
-          {item.role === 'student' && <User size={16} color={colors.background} />}
+          {item.role === 'admin' && <Shield size={16} color="white" />}
+          {item.role === 'teacher' && <UserCheck size={16} color="white" />}
+          {item.role === 'student' && <User size={16} color="white" />}
           <Text style={styles.roleText}>
             {item.role.charAt(0).toUpperCase() + item.role.slice(1)}
           </Text>
         </View>
         
-        {user?.role === 'admin' && (
+        {userRole === 'admin' && (
           <TouchableOpacity 
             onPress={() => openRoleEditor(item)}
             style={styles.moreButton}
@@ -192,10 +219,11 @@ export default function AdminPage() {
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </Animated.View>
   );
 
-  if (loading && !refreshing) {
+  // Loading state
+  if (authLoading || (loading && !refreshing)) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -206,6 +234,7 @@ export default function AdminPage() {
     );
   }
 
+  // Error state
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
@@ -238,7 +267,7 @@ export default function AdminPage() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>User Management</Text>
         <Text style={styles.headerSubtitle}>
-          {profiles.length} registered users
+          {profiles.length} registered user{profiles.length !== 1 ? 's' : ''}
         </Text>
       </View>
 
@@ -290,7 +319,7 @@ export default function AdminPage() {
               <Text style={styles.currentRoleLabel}>Current Role:</Text>
               <View style={[
                 styles.currentRoleBadge,
-                { backgroundColor: getRoleBadgeColor(selectedProfile?.role || 'student', colors) }
+                { backgroundColor: getRoleBadgeColor(selectedProfile?.role || 'student') }
               ]}>
                 <Text style={styles.currentRoleText}>
                   {selectedProfile?.role ? selectedProfile.role.charAt(0).toUpperCase() + selectedProfile.role.slice(1) : 'Unknown'}
@@ -310,7 +339,7 @@ export default function AdminPage() {
                 onPress={() => confirmRoleChange('admin')}
                 disabled={selectedProfile?.role === 'admin' || loading}
               >
-                <Shield size={20} color={colors.background} />
+                <Shield size={20} color="white" />
                 <Text style={styles.roleOptionText}>Admin</Text>
               </TouchableOpacity>
               
@@ -323,7 +352,7 @@ export default function AdminPage() {
                 onPress={() => confirmRoleChange('teacher')}
                 disabled={selectedProfile?.role === 'teacher' || loading}
               >
-                <UserCheck size={20} color={colors.background} />
+                <UserCheck size={20} color="white" />
                 <Text style={styles.roleOptionText}>Teacher</Text>
               </TouchableOpacity>
               
@@ -336,7 +365,7 @@ export default function AdminPage() {
                 onPress={() => confirmRoleChange('student')}
                 disabled={selectedProfile?.role === 'student' || loading}
               >
-                <User size={20} color={colors.background} />
+                <User size={20} color="white" />
                 <Text style={styles.roleOptionText}>Student</Text>
               </TouchableOpacity>
             </View>
@@ -361,6 +390,7 @@ const getStyles = (colors: any) =>
       padding: 16,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
+      backgroundColor: colors.card,
     },
     headerTitle: {
       fontSize: 24,
@@ -429,12 +459,23 @@ const getStyles = (colors: any) =>
     },
     profileCard: {
       backgroundColor: colors.card,
-      borderRadius: 8,
+      borderRadius: 12,
       padding: 16,
       marginBottom: 12,
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
+      ...Platform.select({
+        ios: {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        },
+        android: {
+          elevation: 2,
+        },
+      }),
     },
     profileInfo: {
       flexDirection: 'row',
@@ -477,7 +518,7 @@ const getStyles = (colors: any) =>
     roleText: {
       fontFamily: 'Inter-Medium',
       fontSize: 12,
-      color: colors.background,
+      color: 'white',
       marginLeft: 4,
     },
     moreButton: {
@@ -552,7 +593,7 @@ const getStyles = (colors: any) =>
     currentRoleText: {
       fontFamily: 'Inter-Medium',
       fontSize: 14,
-      color: colors.background,
+      color: 'white',
     },
     roleOptionsContainer: {
       marginTop: 8,
@@ -574,18 +615,18 @@ const getStyles = (colors: any) =>
       opacity: 0.6,
     },
     adminOption: {
-      backgroundColor: colors.error,
+      backgroundColor: '#dc2626', // Red
     },
     teacherOption: {
-      backgroundColor: colors.warning,
+      backgroundColor: '#2563eb', // Blue  
     },
     studentOption: {
-      backgroundColor: colors.success,
+      backgroundColor: '#16a34a', // Green
     },
     roleOptionText: {
       fontFamily: 'Inter-SemiBold',
       fontSize: 16,
-      color: colors.background,
+      color: 'white',
       marginLeft: 12,
     },
     modalLoading: {

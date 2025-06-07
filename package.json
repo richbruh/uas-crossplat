@@ -53,7 +53,8 @@
     "react-native-webview": "13.13.5",
     "readable-stream": "^4.5.2",
     "zustand": "^4.5.2",
-    "expo-dev-client": "~5.2.0"
+    "expo-dev-client": "~5.2.0",
+    "expo-updates": "~0.28.14"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

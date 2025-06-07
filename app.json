@@ -7,17 +7,18 @@
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    
     "newArchEnabled": false,
-    
     "updates": {
       "enabled": false,
       "checkAutomatically": "NEVER",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/718c1e2f-5d30-4f5d-890a-dc04d1649d42"
     },
-    
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "web": {
       "bundler": "metro",
@@ -35,6 +36,13 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/e_learning.png",
         "backgroundColor": "#ffffff"
+      },
+      "runtimeVersion": "1.0.0"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "718c1e2f-5d30-4f5d-890a-dc04d1649d42"
       }
     }
   }
