@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Settings, Award, Book, BookOpen } from 'lucide-react-native';
+import { Settings, Award, Book, BookOpen, ChevronRight, Camera, ImageIcon } from 'lucide-react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,6 +20,9 @@ import SectionHeader from '@/components/SectionHeader';
 import { useTheme } from '../context/ThemeContext';
 import { profile as ProfileType, getRoleBadgeColor } from '@/models/profile';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import EditProfileForm from '@/components/EditProfileForm';
 
 // -----------------------------
 // Constants
@@ -51,6 +54,39 @@ interface UserStats {
 interface LoadingViewProps {
   colors: any;
 }
+
+interface TeacherSectionProps {
+  profile: ProfileType | null;
+  colors: any;
+  onNavigateToTeacher: () => void;
+}
+
+const TeacherSection = ({ profile, colors, onNavigateToTeacher }: TeacherSectionProps) => {
+  if (profile?.role !== 'teacher' && profile?.role !== 'admin') return null;
+
+  return (
+    <Animated.View entering={FadeIn.delay(200).duration(500)}>
+      <View style={styles(colors).teacherSection}>
+        <Text style={styles(colors).sectionTitle}>Teacher Tools</Text>
+        <TouchableOpacity 
+          style={styles(colors).teacherButton}
+          onPress={onNavigateToTeacher}
+        >
+          <View style={styles(colors).teacherButtonContent}>
+            <View style={styles(colors).teacherIcon}>
+              <Settings size={20} color={colors.primary} />
+            </View>
+            <View style={styles(colors).teacherTextContainer}>
+              <Text style={styles(colors).teacherButtonText}>Course Dashboard</Text>
+              <Text style={styles(colors).teacherButtonSubtext}>Manage your courses and lessons</Text>
+            </View>
+            <ChevronRight size={20} color={colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+};
 
 const LoadingView = ({ colors }: LoadingViewProps) => (
   <View style={[styles(colors).container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -110,21 +146,43 @@ interface UserProfileProps {
   profile: ProfileType | null;
   colors: any;
   email: string | undefined;
+  onChangePhoto: () => void;
+  uploadingPhoto: boolean;
 }
 
-const UserProfile = ({ profile, colors, email }: UserProfileProps) => (
+const UserProfile = ({ profile, colors, email, onChangePhoto, uploadingPhoto }: UserProfileProps) => (
   <View style={styles(colors).profileContainer}>
-    {profile?.avatar_url ? (
-      <Image source={{ uri: profile.avatar_url }} style={styles(colors).avatar} />
-    ) : (
-      <View style={[styles(colors).avatar, { backgroundColor: colors.backgroundSecondary, justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ fontSize: 40, color: colors.textPrimary }}>
-          {profile?.full_name?.charAt(0) || '?'}
-        </Text>
+    <TouchableOpacity 
+      onPress={onChangePhoto}
+      style={styles(colors).avatarContainer}
+      disabled={uploadingPhoto}
+    >
+      {profile?.avatar_url ? (
+        <Image source={{ uri: profile.avatar_url }} style={styles(colors).avatar} />
+      ) : (
+        <View style={[styles(colors).avatar, styles(colors).defaultAvatar]}>
+          <Text style={styles(colors).defaultAvatarText}>
+            {profile?.full_name?.charAt(0) || '?'}
+          </Text>
+        </View>
+      )}
+      
+      {/* Camera overlay icon */}
+      <View style={styles(colors).cameraOverlay}>
+        {uploadingPhoto ? (
+          <ActivityIndicator size={16} color={colors.background} />
+        ) : (
+          <Camera size={16} color={colors.background} />
+        )}
       </View>
-    )}
+    </TouchableOpacity>
+    
     <Text style={styles(colors).userName}>{profile?.full_name || 'User'}</Text>
     <Text style={styles(colors).userEmail}>{email}</Text>
+    <Text style={styles(colors).changePhotoHint}>
+      {uploadingPhoto ? 'Uploading...' : 'Tap photo to change'}
+    </Text>
+    
     {profile?.role && (
       <View style={[styles(colors).roleBadge, { backgroundColor: getRoleBadgeColor(profile.role) }]}>
         <Text style={styles(colors).roleBadgeText}>{profile.role}</Text>
@@ -159,12 +217,16 @@ const StatsDisplay = ({ stats, colors }: StatsDisplayProps) => (
 interface ActionButtonsProps {
   colors: any;
   onSignOut: () => void;
+  onEditProfile: () => void;
 }
 
-const ActionButtons = ({ colors, onSignOut }: ActionButtonsProps) => (
+const ActionButtons = ({ colors, onSignOut, onEditProfile }: ActionButtonsProps) => (
   <Animated.View entering={FadeIn.delay(300).duration(500)}>
     <View style={styles(colors).actionsContainer}>
-      <TouchableOpacity style={styles(colors).actionButton}>
+      <TouchableOpacity 
+        style={styles(colors).actionButton}
+        onPress={onEditProfile}
+      >
         <Text style={styles(colors).actionButtonText}>Edit Profile</Text>
       </TouchableOpacity>
       <TouchableOpacity 
@@ -237,6 +299,7 @@ export default function ProfileScreen() {
   // Theme and UI state
   const { theme, setTheme, colors } = useTheme();
   const [isSettingsModalVisible, setSettingsModalVisible] = useState(false);
+  const [isEditModalVisible, setEditModalVisible] = useState(false);
   
   // User data state
   const [profile, setProfile] = useState<ProfileType | null>(null);
@@ -246,7 +309,186 @@ export default function ProfileScreen() {
   // App state
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const router = useRouter();
+
+  // Navigation functions
+  const navigateToTeacherDashboard = () => {
+    router.push('/teacher/dashboard');
+  };
+
+  // Profile update handler
+  const handleProfileUpdate = (updatedProfile: ProfileType) => {
+    setProfile(updatedProfile);
+    setEditModalVisible(false);
+  };
+
+  // Image picker and upload functions
+  const requestImagePickerPermissions = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Required',
+        'Sorry, we need camera roll permissions to change your profile picture.'
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const requestCameraPermissions = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Required',
+        'Sorry, we need camera permissions to take photos.'
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const pickImage = async () => {
+    Alert.alert(
+      'Select Image',
+      'Choose how you want to select your profile picture',
+      [
+        {
+          text: 'Camera',
+          onPress: () => openImagePicker('camera'),
+          style: 'default',
+        },
+        {
+          text: 'Gallery',
+          onPress: () => openImagePicker('library'),
+          style: 'default',
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const openImagePicker = async (source: 'camera' | 'library') => {
+    try {
+      let result;
+      
+      if (source === 'camera') {
+        const hasPermission = await requestCameraPermissions();
+        if (!hasPermission) return;
+        
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+      } else {
+        const hasPermission = await requestImagePickerPermissions();
+        if (!hasPermission) return;
+        
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+      }
+
+      if (!result.canceled && result.assets[0]) {
+        await uploadProfilePicture(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to select image. Please try again.');
+    }
+  };
+
+  const uploadProfilePicture = async (imageUri: string) => {
+    if (!session?.user?.id) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    try {
+      setUploadingPhoto(true);
+
+      // Get file info
+      const fileInfo = await FileSystem.getInfoAsync(imageUri);
+      if (!fileInfo.exists) {
+        throw new Error('File does not exist');
+      }
+
+      // Create file name
+      const fileExt = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
+
+      // Read file as base64
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Convert base64 to blob
+      const arrayBuffer = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+
+      // Delete old avatar if exists
+      if (profile?.avatar_url) {
+        try {
+          const oldFileName = profile.avatar_url.split('/').pop();
+          if (oldFileName) {
+            await supabase.storage
+              .from('avatars')
+              .remove([oldFileName]);
+          }
+        } catch (deleteError) {
+          console.warn('Could not delete old avatar:', deleteError);
+        }
+      }
+
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, arrayBuffer, {
+          contentType: `image/${fileExt}`,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      const avatarUrl = urlData.publicUrl;
+
+      // Update profile with new avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('user_id', session.user.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Update local state
+      setProfile(prev => prev ? { ...prev, avatar_url: avatarUrl } : null);
+      
+      Alert.alert('Success', 'Profile picture updated successfully!');
+
+    } catch (error: any) {
+      console.error('Error uploading profile picture:', error);
+      Alert.alert('Error', error.message || 'Failed to upload profile picture. Please try again.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   // Fetch profile data from Supabase
   useEffect(() => {
@@ -282,40 +524,40 @@ export default function ProfileScreen() {
         created_at: data.created_at
       });
 
-    // Fetch enrollment data with course information for stats
-    const { data: enrollmentData, error: enrollmentError } = await supabase
-      .from('enrollments')
-      .select(`
-        id, 
-        progress_percentage
-      `)
-      .eq('student_id', session.user.id);
+      // Fetch enrollment data with course information for stats
+      const { data: enrollmentData, error: enrollmentError } = await supabase
+        .from('enrollments')
+        .select(`
+          id, 
+          progress_percentage
+        `)
+        .eq('student_id', session.user.id);
 
-    if (enrollmentError) throw enrollmentError;
+      if (enrollmentError) throw enrollmentError;
 
-    // Calculate real stats from enrollment data
-    const enrolledCourses = enrollmentData.length;
-    const completedCourses = enrollmentData.filter(item => item.progress_percentage >= 100).length;
-    
-    // Set real user stats
-    setUserStats({
-      completedCourses,
-      enrolledCourses
-    });
-  }
-  catch(err: any) {
-    console.error('Error fetching profile:', err);
-    
-    if (!session?.user) {
-      setError(ERROR_TYPES.AUTH);
-    } else {
-      setError(err.message || 'Failed to fetch profile data');
+      // Calculate real stats from enrollment data
+      const enrolledCourses = enrollmentData.length;
+      const completedCourses = enrollmentData.filter(item => item.progress_percentage >= 100).length;
+      
+      // Set real user stats
+      setUserStats({
+        completedCourses,
+        enrolledCourses
+      });
     }
-  }
-  finally {
-    setLoading(false);
-  }
-};
+    catch(err: any) {
+      console.error('Error fetching profile:', err);
+      
+      if (!session?.user) {
+        setError(ERROR_TYPES.AUTH);
+      } else {
+        setError(err.message || 'Failed to fetch profile data');
+      }
+    }
+    finally {
+      setLoading(false);
+    }
+  };
 
   // Handle user sign out
   const handleSignOut = async () => {
@@ -379,15 +621,37 @@ export default function ProfileScreen() {
             profile={profile} 
             colors={colors} 
             email={session?.user?.email}
+            onChangePhoto={pickImage}
+            uploadingPhoto={uploadingPhoto}
           />
           
           {/* User Stats */}
           <StatsDisplay stats={userStats} colors={colors} />
           
+          {/* Teacher Section */}
+          <TeacherSection 
+            profile={profile} 
+            colors={colors} 
+            onNavigateToTeacher={navigateToTeacherDashboard}
+          />
+          
           {/* Action Buttons */}
-          <ActionButtons colors={colors} onSignOut={handleSignOut} />
+          <ActionButtons 
+            colors={colors} 
+            onSignOut={handleSignOut}
+            onEditProfile={() => setEditModalVisible(true)}
+          />
         </ScrollView>
       </SafeAreaView>
+
+      {/* Edit Profile Modal */}
+      <EditProfileForm
+        visible={isEditModalVisible}
+        profile={profile}
+        onClose={() => setEditModalVisible(false)}
+        onSuccess={handleProfileUpdate}
+        colors={colors}
+      />
 
       {/* Theme Settings Modal */}
       <ThemeSettingsModal
@@ -440,11 +704,44 @@ const styles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 24,
   },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginBottom: 16,
+  },
+  defaultAvatar: {
+    backgroundColor: colors.backgroundSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  defaultAvatarText: {
+    fontSize: 40,
+    color: colors.textPrimary,
+    fontFamily: 'Inter-SemiBold',
+  },
+  cameraOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.background,
+  },
+  changePhotoHint: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
+    marginBottom: 8,
   },
   userName: {
     fontFamily: 'Inter-SemiBold',
@@ -581,4 +878,57 @@ const styles = (colors: any) => StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
   },
+  teacherSection: {
+    marginHorizontal: 16,
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 18,
+    color: colors.textPrimary,
+    marginBottom: 12,
+  },
+  teacherButton: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  teacherButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  teacherIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.backgroundSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  teacherTextContainer: {
+    flex: 1,
+  },
+  teacherButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  teacherButtonSubtext: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: colors.textSecondary,
+  }
 });

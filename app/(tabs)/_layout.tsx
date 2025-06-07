@@ -1,14 +1,12 @@
 //tabs/_layout.tsx
 import { Tabs } from 'expo-router';
 import { Platform, StyleSheet, View, ViewStyle } from 'react-native';
-import { Chrome as Home, BookOpen, Compass, User, Settings } from 'lucide-react-native';
+import { Chrome as Home, BookOpen, Compass, User } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../context/AuthContext';
 
 export default function TabLayout() {
   const { colors } = useTheme();
-  const { user } = useAuth();
   const styles = getStyles(colors);
   
   const tabBarStyle: ViewStyle = Platform.OS === 'ios' ? {
@@ -39,6 +37,8 @@ export default function TabLayout() {
           Platform.OS === 'ios' && <BlurView tint="light" intensity={80} style={StyleSheet.absoluteFill} />
         ),
       }}>
+      
+      {/* ✅ STUDENT TABS ONLY */}
       <Tabs.Screen
         name="index"
         options={{
@@ -46,6 +46,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
         }}
       />
+      
       <Tabs.Screen
         name="my-learning"
         options={{
@@ -53,6 +54,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <BookOpen size={size} color={color} />,
         }}
       />
+      
       <Tabs.Screen
         name="explore"
         options={{
@@ -61,26 +63,6 @@ export default function TabLayout() {
         }}
       />
       
-      {(user?.role === 'teacher' || user?.role === 'admin') && (
-        <Tabs.Screen
-          name="teacher-dashboard"
-          options={{
-            title: 'Teacher',
-            tabBarIcon: ({ color, size }) => <BookOpen size={size} color={color} />,
-          }}
-        />
-      )}
-      
-      {user?.role === 'admin' && (
-        <Tabs.Screen
-          name="admin"
-          options={{
-            title: 'Admin',
-            tabBarIcon: ({ color, size }) => <Settings size={size} color={color} />,
-          }}
-        />
-      )}
-      
       <Tabs.Screen
         name="profile"
         options={{
@@ -88,6 +70,9 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
         }}
       />
+      
+      {/* ✅ REMOVED: No teacher/admin tabs */}
+      
     </Tabs>
   );
 }
