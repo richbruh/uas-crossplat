@@ -60,10 +60,11 @@ interface QuizLesson {
   course_title?: string;
 }
 
+// ✅ Updated interface to use lesson_id instead of exam_id
 interface SubmissionWithStudent {
   id: string;
   student_id: string;
-  exam_id: string;
+  lesson_id: string; // Changed from exam_id to lesson_id
   photo_url: string;
   grade?: 'A' | 'B' | 'C' | 'D' | 'F';
   feedback?: string;
@@ -72,6 +73,7 @@ interface SubmissionWithStudent {
   student_name?: string;
   student_email?: string;
   lesson_title?: string;
+  lesson_order?: number;
   ocr_text?: string;
 }
 
@@ -115,129 +117,129 @@ const ManageExamPage: React.FC = () => {
     fetchQuizLessonsAndSubmissions();
   }, []);
 
-const fetchQuizLessonsAndSubmissions = async () => {
-  try {
-    setIsLoading(true);
+  const fetchQuizLessonsAndSubmissions = async () => {
+    try {
+      setIsLoading(true);
 
-    if (!session?.user?.id) {
-      Alert.alert('Error', 'Please log in to manage quizzes');
-      return;
-    }
+      if (!session?.user?.id) {
+        Alert.alert('Error', 'Please log in to manage quizzes');
+        return;
+      }
 
-    console.log('🔍 Fetching quiz lessons for teacher:', session.user.id);
+      console.log('🔍 Fetching quiz lessons for teacher:', session.user.id);
 
-    // Fetch quiz lessons directly
-    const { data: lessons, error: lessonsError } = await supabase
-      .from('lessons')
-      .select(`
-        *,
-        courses!inner (
-          id,
-          title,
-          teacher_id
-        )
-      `)
-      .eq('lesson_type', 'quiz')
-      .eq('courses.teacher_id', session.user.id)
-      .order('lesson_order', { ascending: true });
-
-    if (lessonsError) throw lessonsError;
-
-    console.log('📚 Found quiz lessons:', lessons?.length || 0);
-
-    // Fetch submissions for these quiz lessons
-    const lessonIds = lessons?.map(l => l.id) || [];
-    
-    if (lessonIds.length > 0) {
-      const { data: submissionsData, error: submissionsError } = await supabase
-        .from('submissions')
+      // Fetch quiz lessons directly
+      const { data: lessons, error: lessonsError } = await supabase
+        .from('lessons')
         .select(`
           *,
-          profiles!inner (
-            user_id,
-            full_name,
-            email
-          ),
-          lessons!inner (
+          courses!inner (
             id,
             title,
-            lesson_order
+            teacher_id
           )
         `)
-        .in('lesson_id', lessonIds) // Direct lesson reference
-        .order('submitted_at', { ascending: false });
+        .eq('lesson_type', 'quiz')
+        .eq('courses.teacher_id', session.user.id)
+        .order('lesson_order', { ascending: true });
 
-      if (submissionsError) throw submissionsError;
+      if (lessonsError) throw lessonsError;
 
-      console.log('📝 Found submissions:', submissionsData?.length || 0);
+      console.log('📚 Found quiz lessons:', lessons?.length || 0);
 
-      // Process submissions with student info
-      const processedSubmissions: SubmissionWithStudent[] = submissionsData?.map(sub => ({
-        id: sub.id,
-        student_id: sub.student_id,
-        lesson_id: sub.lesson_id, // Updated field name
-        photo_url: sub.photo_url,
-        grade: sub.grade,
-        feedback: sub.feedback,
-        submitted_at: sub.submitted_at,
-        graded_at: sub.graded_at,
-        ocr_text: sub.ocr_text,
-        student_name: sub.profiles?.full_name || 'Unknown Student',
-        student_email: sub.profiles?.email || '',
-        lesson_title: sub.lessons?.title || '',
-        lesson_order: sub.lessons?.lesson_order || 0,
-      })) || [];
+      // Fetch submissions for these quiz lessons
+      const lessonIds = lessons?.map(l => l.id) || [];
+      
+      if (lessonIds.length > 0) {
+        const { data: submissionsData, error: submissionsError } = await supabase
+          .from('submissions')
+          .select(`
+            *,
+            profiles!inner (
+              user_id,
+              full_name,
+              email
+            ),
+            lessons!inner (
+              id,
+              title,
+              lesson_order
+            )
+          `)
+          .in('lesson_id', lessonIds) // Direct lesson reference
+          .order('submitted_at', { ascending: false });
 
-      // Calculate submission stats for each lesson
-      const processedLessons: QuizLesson[] = lessons?.map(lesson => ({
-        ...lesson,
-        course_title: lesson.courses?.title || '',
-        submission_count: processedSubmissions.filter(s => s.lesson_id === lesson.id).length,
-        graded_count: processedSubmissions.filter(s => s.lesson_id === lesson.id && isGraded(s)).length,
-      })) || [];
+        if (submissionsError) throw submissionsError;
 
-      setQuizLessons(processedLessons);
-      setSubmissions(processedSubmissions);
-    } else {
-      setQuizLessons([]);
-      setSubmissions([]);
+        console.log('📝 Found submissions:', submissionsData?.length || 0);
+
+        // ✅ Process submissions with student info - Fixed mapping
+        const processedSubmissions: SubmissionWithStudent[] = submissionsData?.map(sub => ({
+          id: sub.id,
+          student_id: sub.student_id,
+          lesson_id: sub.lesson_id, // Use lesson_id consistently
+          photo_url: sub.photo_url,
+          grade: sub.grade,
+          feedback: sub.feedback,
+          submitted_at: sub.submitted_at,
+          graded_at: sub.graded_at,
+          ocr_text: sub.ocr_text,
+          student_name: sub.profiles?.full_name || 'Unknown Student',
+          student_email: sub.profiles?.email || '',
+          lesson_title: sub.lessons?.title || '',
+          lesson_order: sub.lessons?.lesson_order || 0,
+        })) || [];
+
+        // Calculate submission stats for each lesson
+        const processedLessons: QuizLesson[] = lessons?.map(lesson => ({
+          ...lesson,
+          course_title: lesson.courses?.title || '',
+          submission_count: processedSubmissions.filter(s => s.lesson_id === lesson.id).length,
+          graded_count: processedSubmissions.filter(s => s.lesson_id === lesson.id && isGraded(s)).length,
+        })) || [];
+
+        setQuizLessons(processedLessons);
+        setSubmissions(processedSubmissions);
+      } else {
+        setQuizLessons([]);
+        setSubmissions([]);
+      }
+
+      console.log('✅ Data loaded successfully');
+
+    } catch (error: any) {
+      console.error('❌ Error fetching quiz data:', error);
+      Alert.alert('Error', 'Failed to load quiz data. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    console.log('✅ Data loaded successfully');
-
-  } catch (error: any) {
-    console.error('❌ Error fetching quiz data:', error);
-    Alert.alert('Error', 'Failed to load quiz data. Please try again.');
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-// Update filtering logic
-    const getFilteredSubmissions = () => {
+  // ✅ Single getFilteredSubmissions function - remove duplicates
+  const getFilteredSubmissions = () => {
     let filtered = submissions;
 
     if (selectedLesson) {
-        filtered = filtered.filter(s => s.lesson_id === selectedLesson.id); // Updated field
+      filtered = filtered.filter(s => s.lesson_id === selectedLesson.id); // Use lesson_id
     }
 
-    // Rest of filtering logic remains the same...
     if (searchQuery.trim()) {
-        filtered = filtered.filter(s => 
+      filtered = filtered.filter(s => 
         s.student_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.student_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.lesson_title?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+      );
     }
 
     if (filterStatus === 'graded') {
-        filtered = filtered.filter(s => isGraded(s));
+      filtered = filtered.filter(s => isGraded(s));
     } else if (filterStatus === 'ungraded') {
-        filtered = filtered.filter(s => !isGraded(s));
+      filtered = filtered.filter(s => !isGraded(s));
     }
 
     return filtered;
-    };
+  };
+
   // OCR Processing (Native only)
   const processImageWithOCR = async (imageUrl: string) => {
     if (Platform.OS === 'web') {
@@ -443,31 +445,6 @@ OCR Text: ${submission.ocr_text || 'Not processed'}
     }
   };
 
-  // Filter submissions
-  const getFilteredSubmissions = () => {
-    let filtered = submissions;
-
-    if (selectedLesson) {
-      filtered = filtered.filter(s => s.exam_id === selectedLesson.id);
-    }
-
-    if (searchQuery.trim()) {
-      filtered = filtered.filter(s => 
-        s.student_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.student_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.lesson_title?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    if (filterStatus === 'graded') {
-      filtered = filtered.filter(s => isGraded(s));
-    } else if (filterStatus === 'ungraded') {
-      filtered = filtered.filter(s => !isGraded(s));
-    }
-
-    return filtered;
-  };
-
   // Render Quiz Lesson Card
   const renderQuizLessonCard = ({ item }: { item: QuizLesson }) => (
     <TouchableOpacity
@@ -629,7 +606,7 @@ OCR Text: ${submission.ocr_text || 'Not processed'}
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading exam data...</Text>
+        <Text style={styles.loadingText}>Loading quiz data...</Text>
       </View>
     );
   }
@@ -639,7 +616,7 @@ OCR Text: ${submission.ocr_text || 'Not processed'}
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>📋 Manage Exams</Text>
+          <Text style={styles.headerTitle}>📋 Manage Quiz Submissions</Text>
           <Text style={styles.headerSubtitle}>
             Quiz submissions with OCR processing & PDF export
           </Text>
@@ -927,7 +904,7 @@ OCR Text: ${submission.ocr_text || 'Not processed'}
   );
 };
 
-// Styles (same as before but ensuring web compatibility)
+// ✅ Updated createStyles - remove duplicate modalActions and fix all issues
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
@@ -1473,11 +1450,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     textAlign: 'right',
     marginTop: 6,
   },
+  // ✅ Fixed modalActions - no duplicates
   modalActions: {
     flexDirection: 'row',
     gap: 12,
     paddingHorizontal: Platform.OS === 'web' ? 0 : 20,
     paddingBottom: Platform.OS === 'web' ? 0 : 20,
+    paddingTop: 16,
   },
   modalButton: {
     flex: 1,

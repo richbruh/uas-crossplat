@@ -1,4 +1,3 @@
-//untuk teacher dashboard pakai yang ini
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet,
@@ -26,21 +25,24 @@ import { supabase } from '@/app/utils/supabase';
 import { Course, getGradeLevelLabel } from '@/models/course';
 import { profile } from '@/models/profile';
 import { Lesson } from '@/models/lesson';
-import { Exam } from '@/models/Exam';
 import { Enrollment } from '@/models/enrollment';
 
 // Components
 import MakeCourseForm from '@/components/MakeCourseForm';
 
-// Extended Course type with stats
+// ✅ Updated CourseWithStats interface - remove exam_exists, add quiz stats
 interface CourseWithStats extends Course {
   student_count: number;
   enrollment_count: number;
   avg_progress: number;
   lesson_count: number;
-  exam_exists: boolean;
+  quiz_count: number; // ✅ Count of quiz lessons
   published_lessons: number;
   total_duration: number; // in minutes
+  quiz_submissions: number; // ✅ Count of quiz submissions
+  teacher_name?: string; // For admin view
+  teacher_id: string;
+  is_own_course?: boolean;
 }
 
 // Screen states
@@ -82,9 +84,9 @@ export default function TeacherCourseDashboard() {
         .single();
 
       if (profileError) {
-      console.error('[TEACHER_DASHBOARD] Profile fetch error:', profileError);
-      throw profileError;
-    }
+        console.error('[TEACHER_DASHBOARD] Profile fetch error:', profileError);
+        throw profileError;
+      }
 
       if (!profileData || (profileData.role !== 'teacher' && profileData.role !== 'admin')) {
         setError('Access Denied: This page is for teachers and administrators only.');
@@ -92,11 +94,12 @@ export default function TeacherCourseDashboard() {
         setLoading(false);
         return;
       }
+      
       setUserProfile(profileData);
       const isAdmin = profileData.role === 'admin';
       console.log(`[TEACHER_DASHBOARD] ${profileData.role} access granted for: ${profileData.full_name}`);
       
-      // 2. Fetch Courses for Current Teacher with Lesson and Exam Stats
+      // ✅ 2. Fetch Courses with ONLY Lesson Stats (NO exams reference)
       let courseQuery = supabase
         .from('courses')
         .select(`
@@ -108,95 +111,111 @@ export default function TeacherCourseDashboard() {
             lesson_order,
             created_at
           ),
-          exams(
-            id
+          profiles!courses_teacher_id_fkey(
+            full_name
           )
         `)
-        //.eq('teacher_id', session.user.id)
         .order('created_at', { ascending: false });
 
-        // ✅ Admin sees ALL courses, Teacher sees only their own
-        if (!isAdmin) {
-          courseQuery = courseQuery.eq('teacher_id', session.user.id);
-          console.log('[TEACHER_DASHBOARD] Teacher mode: Fetching own courses only');
-        } else {
-          console.log('[TEACHER_DASHBOARD] Admin mode: Fetching ALL courses');
-        }
+      // ✅ Admin sees ALL courses, Teacher sees only their own
+      if (!isAdmin) {
+        courseQuery = courseQuery.eq('teacher_id', session.user.id);
+        console.log('[TEACHER_DASHBOARD] Teacher mode: Fetching own courses only');
+      } else {
+        console.log('[TEACHER_DASHBOARD] Admin mode: Fetching ALL courses');
+      }
         
-        const { data: coursesData, error: coursesError } = await courseQuery;
+      const { data: coursesData, error: coursesError } = await courseQuery;
 
-        if (coursesError) {
-          console.error('[TEACHER_DASHBOARD] Courses fetch error:', coursesError);
-          throw coursesError;
-        }
+      if (coursesError) {
+        console.error('[TEACHER_DASHBOARD] Courses fetch error:', coursesError);
+        throw coursesError;
+      }
 
       console.log('[TEACHER_DASHBOARD] Raw courses data:', coursesData?.length);
 
-   // 3. Process Courses with Enhanced Stats
-    const coursesWithFullStats: CourseWithStats[] = await Promise.all(
-      (coursesData || []).map(async (course) => {
-        console.log(`[TEACHER_DASHBOARD] Processing course: ${course.title}`);
+      // ✅ 3. Process Courses with Enhanced Stats (including quiz data)
+      const coursesWithFullStats: CourseWithStats[] = await Promise.all(
+        (coursesData || []).map(async (course) => {
+          console.log(`[TEACHER_DASHBOARD] Processing course: ${course.title}`);
 
-        // Fetch enrollment statistics
-        const { data: enrollments, error: enrollmentError } = await supabase
-          .from('enrollments')
-          .select('progress_percentage')
-          .eq('course_id', course.id);
+          // Fetch enrollment statistics
+          const { data: enrollments, error: enrollmentError } = await supabase
+            .from('enrollments')
+            .select('progress_percentage')
+            .eq('course_id', course.id);
 
-        if (enrollmentError) {
-          console.error(`Error fetching enrollments for course ${course.id}:`, enrollmentError);
-        }
+          if (enrollmentError) {
+            console.error(`Error fetching enrollments for course ${course.id}:`, enrollmentError);
+          }
 
-        // Calculate lesson statistics
-        const lessons = course.lessons || [];
-        const publishedLessons = lessons.filter(() => true); // All lessons considered published
+          // ✅ Calculate lesson statistics (including quiz lessons)
+          const lessons = course.lessons || [];
+          const publishedLessons = lessons.filter(() => true); // All lessons considered published
+          const quizLessons = lessons.filter((lesson: any) => lesson.lesson_type === 'quiz');
 
-        const totalDuration = lessons.reduce((sum: number, lesson: any) => 
-          sum + (lesson.duration || 0), 0
-        );
+          const totalDuration = lessons.reduce((sum: number, lesson: any) => 
+            sum + (lesson.duration || 0), 0
+          );
 
-        // Calculate enrollment statistics
-        const safeEnrollments = enrollments || [];
-        const studentCount = safeEnrollments.length;
+          // ✅ Fetch quiz submission count for this course (only if there are quiz lessons)
+          let quizSubmissionsCount = 0;
+          if (quizLessons.length > 0) {
+            const { data: submissions, error: submissionsError } = await supabase
+              .from('submissions')
+              .select('id')
+              .in('lesson_id', quizLessons.map((l: any) => l.id));
 
-        const avgProgress = studentCount > 0
-          ? Math.round(
-              safeEnrollments.reduce((sum, enrollment) => 
-                sum + (enrollment.progress_percentage || 0), 0
-              ) / studentCount
-            )
-          : 0;
+            if (submissionsError) {
+              console.error(`Error fetching submissions for course ${course.id}:`, submissionsError);
+            } else {
+              quizSubmissionsCount = submissions?.length || 0;
+            }
+          }
 
-        const courseStats = {
-          ...course,
-          student_count: studentCount,
-          enrollment_count: studentCount,
-          avg_progress: avgProgress,
-          lesson_count: lessons.length,
-          published_lessons: publishedLessons.length,
-          total_duration: totalDuration,
-          exam_exists: (course.exams?.length || 0) > 0,
-          // ✅ NEW: Add teacher info for admin view
-          teacher_name: course.profiles?.full_name || 'Unknown Teacher',
-          teacher_id: course.teacher_id,
-          is_own_course: course.teacher_id === session.user.id,
-        };
+          // Calculate enrollment statistics
+          const safeEnrollments = enrollments || [];
+          const studentCount = safeEnrollments.length;
 
-        return courseStats;
-      })
-    );
+          const avgProgress = studentCount > 0
+            ? Math.round(
+                safeEnrollments.reduce((sum, enrollment) => 
+                  sum + (enrollment.progress_percentage || 0), 0
+                ) / studentCount
+              )
+            : 0;
 
-    console.log('[TEACHER_DASHBOARD] Processed courses:', coursesWithFullStats.length);
-    setCourses(coursesWithFullStats);
+          const courseStats: CourseWithStats = {
+            ...course,
+            student_count: studentCount,
+            enrollment_count: studentCount,
+            avg_progress: avgProgress,
+            lesson_count: lessons.length,
+            published_lessons: publishedLessons.length,
+            total_duration: totalDuration,
+            quiz_count: quizLessons.length, // ✅ Count of quiz lessons
+            quiz_submissions: quizSubmissionsCount, // ✅ Count of submissions
+            // ✅ Teacher info for admin view
+            teacher_name: course.profiles?.full_name || 'Unknown Teacher',
+            teacher_id: course.teacher_id,
+            is_own_course: course.teacher_id === session.user.id,
+          };
 
-  } catch (err: any) {
-    console.error('Error fetching teacher dashboard data:', err);
-    setError(err.message || 'An unexpected error occurred.');
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-}, [session, authLoading]);
+          return courseStats;
+        })
+      );
+
+      console.log('[TEACHER_DASHBOARD] Processed courses:', coursesWithFullStats.length);
+      setCourses(coursesWithFullStats);
+
+    } catch (err: any) {
+      console.error('Error fetching teacher dashboard data:', err);
+      setError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [session, authLoading]);
 
   useEffect(() => {
     fetchInitialData();
@@ -209,9 +228,19 @@ export default function TeacherCourseDashboard() {
   };
 
   const handleDeleteCourse = (course: CourseWithStats) => {
+    // ✅ Check permission first
+    if (userProfile?.role === 'admin' && !course.is_own_course) {
+      Alert.alert(
+        'Permission Denied',
+        'Administrators can only delete their own courses.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+
     Alert.alert(
       'Delete Course',
-      `Are you sure you want to delete "${course.title}"?\n\nThis will permanently remove:\n• ${course.lesson_count} lessons\n• ${course.student_count} student enrollments\n• ${course.exam_exists ? 'Exam data' : 'No exams'}\n\nThis action cannot be undone.`,
+      `Are you sure you want to delete "${course.title}"?\n\nThis will permanently remove:\n• ${course.lesson_count} lessons\n• ${course.student_count} student enrollments\n• ${course.quiz_count} quiz lessons\n• ${course.quiz_submissions} quiz submissions\n\nThis action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -221,21 +250,28 @@ export default function TeacherCourseDashboard() {
             try {
               setLoading(true);
               
-              // Delete course (should cascade delete lessons, exams, enrollments via RLS)
+              // ✅ Delete course with proper error handling
               const { error: deleteError } = await supabase
                 .from('courses')
                 .delete()
                 .eq('id', course.id)
-                .eq('teacher_id', session?.user?.id); // Extra security check
+                .eq('teacher_id', course.teacher_id); // ✅ Use course.teacher_id instead of session
 
-              if (deleteError) throw deleteError;
+              if (deleteError) {
+                console.error('Delete course error:', deleteError);
+                throw deleteError;
+              }
 
               Alert.alert('Success', 'Course deleted successfully.');
-              fetchInitialData();
+              await fetchInitialData(); // ✅ Await the refresh
             } catch (err: any) {
               console.error('Delete course error:', err);
-              Alert.alert('Error', err.message || 'Failed to delete course.');
-              setLoading(false);
+              Alert.alert(
+                'Error', 
+                err.message || 'Failed to delete course. Please try again.'
+              );
+            } finally {
+              setLoading(false); // ✅ Always set loading to false
             }
           },
         },
@@ -250,6 +286,16 @@ export default function TeacherCourseDashboard() {
 
   // Navigation Functions
   const navigateToEditCourse = (course: Course) => {
+    // ✅ Check permission for editing
+    if (userProfile?.role === 'admin' && course.teacher_id !== session?.user?.id) {
+      Alert.alert(
+        'Permission Denied',
+        'Administrators can only edit their own courses.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+
     setEditingCourse(course);
     setViewMode('editCourse');
   };
@@ -261,13 +307,14 @@ export default function TeacherCourseDashboard() {
     });
   };
 
-  const navigateToManageExam = (courseId: string, courseTitle: string, examExists: boolean) => {
+  // ✅ Navigate to exam management (keeping existing file name)
+  const navigateToManageQuiz = (courseId: string, courseTitle: string, quizCount: number) => {
     router.push({ 
-      pathname: '/teacher/manage-exam', 
+      pathname: '/teacher/manage-exam', // ✅ Keep existing file name
       params: { 
         courseId, 
         courseTitle, 
-        examExists: examExists.toString() 
+        quizCount: quizCount.toString() 
       } 
     });
   };
@@ -306,7 +353,7 @@ export default function TeacherCourseDashboard() {
 
     const totalStudents = courses.reduce((sum, course) => sum + course.student_count, 0);
     const totalLessons = courses.reduce((sum, course) => sum + course.lesson_count, 0);
-    const totalDuration = courses.reduce((sum, course) => sum + course.total_duration, 0);
+    const totalQuizzes = courses.reduce((sum, course) => sum + course.quiz_count, 0);
     const avgProgressAll = courses.length > 0
       ? Math.round(courses.reduce((sum, course) => sum + course.avg_progress, 0) / courses.length)
       : 0;
@@ -329,9 +376,9 @@ export default function TeacherCourseDashboard() {
           <Text style={styles.statLabel}>Lessons</Text>
         </View>
         <View style={styles.statCard}>
-          <Settings size={24} color={colors.info} />
-          <Text style={styles.statNumber}>{avgProgressAll}%</Text>
-          <Text style={styles.statLabel}>Avg Progress</Text>
+          <CheckSquare size={24} color={colors.info} />
+          <Text style={styles.statNumber}>{totalQuizzes}</Text>
+          <Text style={styles.statLabel}>Quizzes</Text>
         </View>
       </Animated.View>
     );
@@ -361,9 +408,19 @@ export default function TeacherCourseDashboard() {
           <Text style={styles.courseDetailText}>
             {course.student_count} Students • {course.avg_progress}% Avg Progress
           </Text>
+          {/* ✅ Show quiz info instead of exam */}
+          <Text style={styles.courseDetailText}>
+            {course.quiz_count} Quizzes • {course.quiz_submissions} Submissions
+          </Text>
           {course.total_duration > 0 && (
             <Text style={styles.courseDetailText}>
               Duration: {formatDuration(course.total_duration)}
+            </Text>
+          )}
+          {/* ✅ Show teacher name for admin view */}
+          {userProfile?.role === 'admin' && !course.is_own_course && (
+            <Text style={[styles.courseDetailText, { color: colors.primary }]}>
+              Teacher: {course.teacher_name}
             </Text>
           )}
         </View>
@@ -373,8 +430,13 @@ export default function TeacherCourseDashboard() {
       
       <View style={styles.courseActionsContainer}>
         <TouchableOpacity 
-          style={[styles.actionButtonSmall, styles.editButton]} 
+          style={[
+            styles.actionButtonSmall, 
+            styles.editButton,
+            (userProfile?.role === 'admin' && !course.is_own_course) && styles.disabledButton
+          ]} 
           onPress={() => navigateToEditCourse(course)}
+          disabled={userProfile?.role === 'admin' && !course.is_own_course}
         >
           <Edit size={16} color={colors.background} />
           <Text style={styles.actionButtonText}>Edit</Text>
@@ -388,17 +450,23 @@ export default function TeacherCourseDashboard() {
           <Text style={styles.actionButtonText}>Lessons</Text>
         </TouchableOpacity>
         
+        {/* ✅ Updated to Quiz button */}
         <TouchableOpacity 
           style={[styles.actionButtonSmall, styles.examButton]} 
-          onPress={() => navigateToManageExam(course.id, course.title, course.exam_exists)}
+          onPress={() => navigateToManageQuiz(course.id, course.title, course.quiz_count)}
         >
           <CheckSquare size={16} color={colors.background} />
-          <Text style={styles.actionButtonText}>Exam</Text>
+          <Text style={styles.actionButtonText}>Quiz</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={[styles.actionButtonSmall, styles.deleteButton]} 
+          style={[
+            styles.actionButtonSmall, 
+            styles.deleteButton,
+            (userProfile?.role === 'admin' && !course.is_own_course) && styles.disabledButton
+          ]} 
           onPress={() => handleDeleteCourse(course)}
+          disabled={userProfile?.role === 'admin' && !course.is_own_course}
         >
           <Trash2 size={16} color={colors.background} />
           <Text style={styles.actionButtonText}>Delete</Text>
@@ -431,6 +499,7 @@ export default function TeacherCourseDashboard() {
           <Text style={styles.headerTitle}>Course Dashboard</Text>
           <Text style={styles.headerSubtitle}>
             Welcome, {userProfile?.full_name || 'Teacher'}!
+            {userProfile?.role === 'admin' && ' (Admin View)'}
           </Text>
         </View>
         {courses.length > 0 && (
@@ -495,7 +564,7 @@ export default function TeacherCourseDashboard() {
   }
 }
 
-// Styles (same as before, with minor adjustments)
+// ✅ Complete Styles with fixes
 const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
   StyleSheet.create({
     container: {
@@ -672,6 +741,10 @@ const getStyles = (colors: typeof import('@/constants/Colors').default.light) =>
     },
     deleteButton: {
       backgroundColor: colors.error,
+    },
+    // ✅ Add disabled button style
+    disabledButton: {
+      opacity: 0.5,
     },
     emptyContainer: {
       flex: 1,

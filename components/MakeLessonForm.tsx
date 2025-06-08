@@ -105,36 +105,36 @@ const MakeLessonForm: React.FC<MakeLessonFormProps> = ({
   }, [existingLesson]);
 
   // ✅ Enhanced validation with all fields
-  const validateForm = (): boolean => {
-    const newErrors: Partial<LessonFormData> = {};
+const validateForm = (): boolean => {
+  const newErrors: Partial<LessonFormData> = {};
 
-    if (!formData.title.trim()) {
-      newErrors.title = 'Please enter a lesson title';
-    } else if (formData.title.length > 100) {
-      newErrors.title = 'Title must be 100 characters or less';
+  if (!formData.title.trim()) {
+    newErrors.title = 'Please enter a lesson title';
+  } else if (formData.title.length > 100) {
+    newErrors.title = 'Title must be 100 characters or less';
+  }
+
+  if (!formData.content.trim()) {
+    newErrors.content = 'Please enter lesson content';
+  }
+
+  // Validate video URL for video lessons
+  if (formData.lesson_type === 'video' && formData.video_url.trim()) {
+    try {
+      new URL(formData.video_url);
+    } catch {
+      newErrors.video_url = 'Please enter a valid video URL';
     }
+  }
 
-    if (!formData.content.trim()) {
-      newErrors.content = 'Please enter lesson content';
-    }
+  // ✅ Fix duration validation - check for number type properly
+  if (formData.duration !== null && (formData.duration < 1 || formData.duration > 300)) {
+    newErrors.duration = 'Duration must be between 1 and 300 minutes';
+  }
 
-    // Validate video URL for video lessons
-    if (formData.lesson_type === 'video' && formData.video_url.trim()) {
-      try {
-        new URL(formData.video_url);
-      } catch {
-        newErrors.video_url = 'Please enter a valid video URL';
-      }
-    }
-
-    // Validate duration
-    if (formData.duration && (formData.duration < 1 || formData.duration > 300)) {
-      newErrors.duration = 'Duration must be between 1 and 300 minutes';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
 
   // ✅ Handle form submission with complete lesson data
   const handleSubmit = async () => {
@@ -339,7 +339,10 @@ const MakeLessonForm: React.FC<MakeLessonFormProps> = ({
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Lesson Title</Text>
           <TextInput
-            style={[styles.input, errors.title && styles.inputError]}
+            style={[
+              styles.input, 
+              errors.title ? styles.inputError : null // ✅ Fix conditional style
+            ]}
             placeholder={`e.g., Introduction to ${getLessonTypeLabel(formData.lesson_type)}`}
             placeholderTextColor={colors.textTertiary}
             value={formData.title}
@@ -377,7 +380,10 @@ const MakeLessonForm: React.FC<MakeLessonFormProps> = ({
             <View style={styles.inputWithIcon}>
               <Video size={20} color={colors.textTertiary} style={styles.inputIcon} />
               <TextInput
-                style={[styles.inputWithIconText, errors.video_url && styles.inputError]}
+                style={[
+                  styles.inputWithIconText, 
+                  errors.video_url ? styles.inputError : null // ✅ Fix conditional style
+                ]}
                 placeholder="https://youtube.com/watch?v=... or direct video URL"
                 placeholderTextColor={colors.textTertiary}
                 value={formData.video_url}
@@ -399,7 +405,10 @@ const MakeLessonForm: React.FC<MakeLessonFormProps> = ({
           <View style={styles.inputWithIcon}>
             <Clock size={20} color={colors.textTertiary} style={styles.inputIcon} />
             <TextInput
-              style={[styles.inputWithIconText, errors.duration && styles.inputError]}
+              style={[
+                styles.inputWithIconText, 
+                errors.duration ? styles.inputError : null // ✅ Fix conditional style
+              ]}
               placeholder={`e.g., ${formData.lesson_type === 'video' ? '15' : formData.lesson_type === 'quiz' ? '10' : '20'}`}
               placeholderTextColor={colors.textTertiary}
               value={formData.duration?.toString() || ''}
@@ -415,7 +424,6 @@ const MakeLessonForm: React.FC<MakeLessonFormProps> = ({
             Estimated time to complete this lesson
           </Text>
         </View>
-        
         {/* ✅ Lesson Content */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Lesson Content</Text>
