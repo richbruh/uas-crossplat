@@ -46,8 +46,8 @@ export default function AdminLayout() {
     );
   }
 
-  // ✅ SECURITY: Redirect non-teachers
-  if (!session?.user || userRole !== 'teacher') {
+  //Redirect student
+  if (!session?.user || userRole !== 'admin') {
     return <Redirect href="/(tabs)" />;
   }
 

@@ -46,7 +46,7 @@ export default function TeacherLayout() {
     );
   }
 
-  // ✅ SECURITY: Redirect students
+  // SECURITY: Redirect students
   if (!session?.user || (userRole !== 'teacher' && userRole !== 'admin')) {
     return <Redirect href="/(tabs)" />;
   }

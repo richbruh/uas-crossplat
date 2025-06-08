@@ -60,14 +60,18 @@ interface TeacherSectionProps {
   colors: any;
   onNavigateToTeacher: () => void;
   onNavigateToAdmin: () => void;
+  onVerifyAdminRole: () => void;
 }
 
-
-// Replace the existing TeacherSection component
-const TeacherSection = ({ profile, colors, onNavigateToTeacher, onNavigateToAdmin }: TeacherSectionProps) => {
+const TeacherSection = ({ profile, colors, onNavigateToTeacher, onNavigateToAdmin, onVerifyAdminRole }: TeacherSectionProps) => {
+  console.log('[TEACHER_SECTION] Rendering with profile:', profile);
+  
   // Show for both teacher and admin roles
-  if (profile?.role !== 'teacher' && profile?.role !== 'admin') return null;
-
+  if (profile?.role !== 'teacher' && profile?.role !== 'admin') {
+    console.log('[TEACHER_SECTION] Not showing section - role not teacher/admin, current role:', profile?.role);
+    return null;
+  }
+  
   return (
     <Animated.View entering={FadeIn.delay(200).duration(500)}>
       <View style={styles(colors).teacherSection}>
@@ -75,10 +79,13 @@ const TeacherSection = ({ profile, colors, onNavigateToTeacher, onNavigateToAdmi
           {profile?.role === 'admin' ? 'Management Tools' : 'Teacher Tools'}
         </Text>
         
-        {/* Teacher Dashboard Access */}
+        {/* Course Dashboard */}
         <TouchableOpacity 
           style={styles(colors).teacherButton}
-          onPress={onNavigateToTeacher}
+          onPress={() => {
+            console.log('[TEACHER_SECTION] Course dashboard pressed');
+            onNavigateToTeacher();
+          }}
         >
           <View style={styles(colors).teacherButtonContent}>
             <View style={styles(colors).teacherIcon}>
@@ -97,25 +104,95 @@ const TeacherSection = ({ profile, colors, onNavigateToTeacher, onNavigateToAdmi
           </View>
         </TouchableOpacity>
 
-        {/* ✅ FIXED: Admin-Only Navigation */}
+        {/* Admin Dashboard */}
         {profile?.role === 'admin' && (
-          <TouchableOpacity 
-            style={[styles(colors).teacherButton, { marginTop: 12 }]}
-            onPress={onNavigateToAdmin} // ✅ Use the correct prop
-          >
-            <View style={styles(colors).teacherButtonContent}>
-              <View style={[styles(colors).teacherIcon, { backgroundColor: colors.error + '20' }]}>
-                <Award size={20} color={colors.error} />
+          <>
+            <TouchableOpacity 
+              style={[
+                styles(colors).teacherButton, 
+                { 
+                  marginTop: 12,
+                  borderWidth: 2,
+                  borderColor: colors.error + '50',
+                  backgroundColor: colors.error + '10'
+                }
+              ]}
+              onPress={() => {
+                console.log('[TEACHER_SECTION] Admin dashboard button pressed!');
+                console.log('[TEACHER_SECTION] Profile role:', profile?.role);
+                console.log('[TEACHER_SECTION] Calling onNavigateToAdmin...');
+                onNavigateToAdmin();
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles(colors).teacherButtonContent}>
+                <View style={[styles(colors).teacherIcon, { backgroundColor: colors.error + '20' }]}>
+                  <Award size={20} color={colors.error} />
+                </View>
+                <View style={styles(colors).teacherTextContainer}>
+                  <Text style={[
+                    styles(colors).teacherButtonText,
+                    { color: colors.error, fontWeight: 'bold' }
+                  ]}>
+                    🔥 Admin Dashboard
+                  </Text>
+                  <Text style={styles(colors).teacherButtonSubtext}>
+                    Manage users, system settings & analytics
+                  </Text>
+                </View>
+                <ChevronRight size={20} color={colors.error} />
               </View>
-              <View style={styles(colors).teacherTextContainer}>
-                <Text style={styles(colors).teacherButtonText}>Admin Dashboard</Text>
-                <Text style={styles(colors).teacherButtonSubtext}>
-                  Manage users, system settings & analytics
-                </Text>
-              </View>
-              <ChevronRight size={20} color={colors.textSecondary} />
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+
+            {/* DEBUG: Add database verification button */}
+            {__DEV__ && (
+              <TouchableOpacity 
+                style={[
+                  styles(colors).teacherButton, 
+                  { 
+                    marginTop: 8,
+                    backgroundColor: 'orange',
+                    borderWidth: 1,
+                    borderColor: 'darkorange'
+                  }
+                ]}
+                onPress={onVerifyAdminRole}
+                activeOpacity={0.7}
+              >
+                <View style={styles(colors).teacherButtonContent}>
+                  <View style={[styles(colors).teacherIcon, { backgroundColor: 'white' }]}>
+                    <Text style={{ fontSize: 16 }}>🔍</Text>
+                  </View>
+                  <View style={styles(colors).teacherTextContainer}>
+                    <Text style={[styles(colors).teacherButtonText, { color: 'white' }]}>
+                      🧪 Debug: Verify Admin Role
+                    </Text>
+                    <Text style={[styles(colors).teacherButtonSubtext, { color: 'white' }]}>
+                      Check database role directly
+                    </Text>
+                  </View>
+                  <ChevronRight size={20} color="white" />
+                </View>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+        
+        {/* DEBUG: Show current role status */}
+        {__DEV__ && (
+          <View style={{ 
+            padding: 12, 
+            backgroundColor: profile?.role === 'admin' ? 'green' : 'orange', 
+            borderRadius: 8, 
+            marginTop: 12 
+          }}>
+            <Text style={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>
+              DEBUG: Current Role = "{profile?.role || 'undefined'}"
+            </Text>
+            <Text style={{ color: 'white', fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+              User ID: {profile?.user_id || 'undefined'}
+            </Text>
+          </View>
         )}
       </View>
     </Animated.View>
@@ -352,12 +429,90 @@ export default function ProfileScreen() {
   };
 
   const navigateToAdminDashboard = () => {
-    console.log('[PROFILE] Navigating to admin dashboard...');
+    console.log('=== ADMIN NAVIGATION DEBUG ===');
+    console.log('[PROFILE] Current session:', session);
+    console.log('[PROFILE] Session user ID:', session?.user?.id);
+    console.log('[PROFILE] Profile data:', profile);
+    console.log('[PROFILE] Profile role:', profile?.role);
+    console.log('[PROFILE] Profile user_id:', profile?.user_id);
+    
+    // Detailed role verification
+    if (!profile) {
+      console.error('[PROFILE] Profile is null/undefined');
+      Alert.alert('Error', 'Profile not loaded. Please try again.');
+      return;
+    }
+
+    if (profile.role !== 'admin') {
+      console.error('[PROFILE] Access denied - role is:', profile.role);
+      Alert.alert('Access Denied', `Your role is: ${profile.role}. Admin access required.`);
+      return;
+    }
+
+    console.log('[PROFILE] ✅ Admin role verified, attempting navigation...');
+    
     try {
-      router.push('/admin/admin'); // Navigate to admin.tsx
+      console.log('[PROFILE] Calling router.push("/admin/admin")...');
+      router.push('/admin/admin');
+      console.log('[PROFILE] ✅ Navigation call completed');
+      
+      // Add success tracking
+      setTimeout(() => {
+        console.log('[PROFILE] Navigation should have completed by now');
+      }, 2000);
+      
     } catch (error) {
-      console.error('[PROFILE] Error navigating to admin:', error);
-      Alert.alert('Navigation Error', 'Failed to open admin dashboard. Please try again.');
+      console.error('[PROFILE] ❌ Navigation error:', error);
+      Alert.alert('Navigation Error', `Failed to open admin dashboard: ${error}`);
+    }
+    
+    console.log('=== END ADMIN NAVIGATION DEBUG ===');
+  };
+
+  const verifyAdminRoleFromDatabase = async () => {
+    if (!session?.user?.id) {
+      Alert.alert('Error', 'No session found');
+      return;
+    }
+
+    try {
+      console.log('[ADMIN_VERIFY] Checking role in database for user:', session.user.id);
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, role')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (error) {
+        console.error('[ADMIN_VERIFY] Database error:', error);
+        Alert.alert('Database Error', error.message);
+        return;
+      }
+
+      console.log('[ADMIN_VERIFY] Database result:', data);
+
+      Alert.alert(
+        'Database Role Check',
+        `User ID: ${data.user_id}\nName: ${data.full_name}\nRole: ${data.role}\n\nLocal profile role: ${profile?.role}`,
+        [
+          {
+            text: 'Navigate to Admin',
+            onPress: () => {
+              if (data.role === 'admin') {
+                router.push('/admin/admin');
+              } else {
+                Alert.alert('Access Denied', 'Database shows you are not an admin');
+              }
+            }
+          },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+
+    } catch (error) {
+      console.error('[ADMIN_VERIFY] Verification error:', error);
+      Alert.alert('Error', 'Failed to verify role');
     }
   };
 
@@ -416,7 +571,6 @@ export default function ProfileScreen() {
     );
   };
 
-  
   const openImagePicker = async (source: 'camera' | 'library') => {
     try {
       let result;
@@ -679,7 +833,9 @@ export default function ProfileScreen() {
             colors={colors} 
             onNavigateToTeacher={navigateToTeacherDashboard}
             onNavigateToAdmin={navigateToAdminDashboard}
+            onVerifyAdminRole={verifyAdminRoleFromDatabase}
           />
+          
           {/* Action Buttons */}
           <ActionButtons 
             colors={colors} 

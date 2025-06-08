@@ -9,11 +9,8 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
-  Image
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import * as ImagePicker from 'expo-image-picker';
-import { Camera, X, Check, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { X, Check, BookOpen, Hash, FileText } from 'lucide-react-native';
 import { useTheme } from '../app/context/ThemeContext';
 import { useAuth } from '../app/context/AuthContext';
 import { supabase } from '@/app/utils/supabase';
@@ -26,11 +23,11 @@ interface MakeLessonFormProps {
   existingLesson?: Lesson;
 }
 
+// ✅ Simple form data interface
 interface LessonFormData {
   title: string;
   content: string;
   lesson_order: number;
-  course_id: string;
 }
 
 const MakeLessonForm: React.FC<MakeLessonFormProps> = ({
@@ -43,21 +40,23 @@ const MakeLessonForm: React.FC<MakeLessonFormProps> = ({
   const styles = createStyles(colors);
   const { session } = useAuth();
 
+  // ✅ Simple form state
   const [formData, setFormData] = useState<LessonFormData>({
     title: '',
     content: '',
-    lesson_order: 1,
-    course_id: courseId,
+    lesson_order: 1
   });
 
   const [errors, setErrors] = useState<Partial<LessonFormData>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [nextOrderNumber, setNextOrderNumber] = useState(1);
 
+  // ✅ Fetch next lesson order automatically
   useEffect(() => {
-    console.log('Fetching next lesson order for course:', courseId);
     const fetchNextOrderNumber = async () => {
       try {
+        console.log('🔍 Fetching next lesson order for course:', courseId);
+        
         const { data: lessons, error } = await supabase
           .from('lessons')
           .select('lesson_order')
@@ -66,43 +65,50 @@ const MakeLessonForm: React.FC<MakeLessonFormProps> = ({
           .limit(1);
 
         if (error) throw error;
-        console.log('Fetched lesson order data:', lessons);
 
         const maxOrder = lessons?.[0]?.lesson_order || 0;
-        setNextOrderNumber(maxOrder + 1);
+        const nextOrder = maxOrder + 1;
+        
+        setNextOrderNumber(nextOrder);
 
+        // Auto-set next order for new lessons
         if (!existingLesson) {
-          setFormData(prev => ({ ...prev, lesson_order: maxOrder + 1 }));
+          setFormData(prev => ({ ...prev, lesson_order: nextOrder }));
         }
+
+        console.log('📊 Next lesson order:', nextOrder);
       } catch (error) {
-        console.error('Error fetching lesson order:', error);
+        console.error('❌ Error fetching lesson order:', error);
       }
     };
 
     fetchNextOrderNumber();
   }, [courseId, existingLesson]);
 
+  // ✅ Load existing lesson data
   useEffect(() => {
     if (existingLesson) {
-      console.log('Editing existing lesson:', existingLesson);
+      console.log('✏️ Loading existing lesson:', existingLesson.title);
       setFormData({
         title: existingLesson.title,
         content: existingLesson.content || '',
         lesson_order: existingLesson.lesson_order,
-        course_id: existingLesson.course_id,
       });
     }
   }, [existingLesson]);
 
+  // ✅ Simple validation
   const validateForm = (): boolean => {
     const newErrors: Partial<LessonFormData> = {};
 
     if (!formData.title.trim()) {
-      newErrors.title = 'Lesson title is required';
+      newErrors.title = 'Please enter a lesson title';
+    } else if (formData.title.length > 100) {
+      newErrors.title = 'Title must be 100 characters or less';
     }
 
     if (!formData.content.trim()) {
-      newErrors.content = 'Lesson content is required';
+      newErrors.content = 'Please enter lesson content';
     }
 
     if (formData.lesson_order < 1) {
@@ -110,45 +116,105 @@ const MakeLessonForm: React.FC<MakeLessonFormProps> = ({
     }
 
     setErrors(newErrors);
-    console.log('Validation result:', newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  // ✅ Handle form submission
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
     setIsLoading(true);
-    console.log('Submitting form data:', formData);
+    console.log('🚀 Creating lesson...', formData);
 
     try {
+      // Validate session
+      if (!session?.user?.id) {
+        throw new Error('Please log in to create lessons');
+      }
+
+      // ✅ Check for duplicate lesson orders (only for new lessons)
+      if (!existingLesson) {
+        const { data: existingLessons, error: checkError } = await supabase
+          .from('lessons')
+          .select('lesson_order')
+          .eq('course_id', courseId)
+          .eq('lesson_order', formData.lesson_order);
+
+        if (checkError) throw checkError;
+
+        if (existingLessons && existingLessons.length > 0) {
+          Alert.alert(
+            'Order Already Exists',
+            `Lesson order ${formData.lesson_order} is already taken. Please choose a different order.`,
+            [{ text: 'OK' }]
+          );
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // ✅ Prepare lesson data - only fields that exist in database
       const lessonData = {
-        ...formData,
-        teacher_id: session?.user.id,
+        course_id: courseId,
+        title: formData.title.trim(),
+        content: formData.content.trim(),
+        lesson_order: formData.lesson_order,
+        // ✅ Add teacher_id from session for ownership tracking
+        teacher_id: session.user.id,
       };
 
+      console.log('📝 Lesson data prepared:', lessonData);
+
       if (existingLesson) {
-        console.log('Updating lesson:', existingLesson.id);
-        const { error } = await supabase
+        // Update existing lesson
+        console.log('🔄 Updating lesson:', existingLesson.id);
+        
+        const { data, error } = await supabase
           .from('lessons')
           .update(lessonData)
-          .eq('id', existingLesson.id);
+          .eq('id', existingLesson.id)
+          .select()
+          .single();
 
         if (error) throw error;
-        console.log('Lesson updated successfully.');
+        
+        console.log('✅ Lesson updated successfully:', data);
+        Alert.alert('Success!', 'Lesson updated successfully');
       } else {
-        console.log('Inserting new lesson');
-        const { error } = await supabase
+        // Create new lesson
+        console.log('➕ Creating new lesson...');
+        
+        const { data, error } = await supabase
           .from('lessons')
-          .insert(lessonData);
+          .insert(lessonData)
+          .select()
+          .single();
 
         if (error) throw error;
-        console.log('Lesson created successfully.');
+        
+        console.log('✅ Lesson created successfully:', data);
+        Alert.alert('Success!', 'Lesson created successfully');
       }
 
       onSuccess();
+      
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save lesson');
-      console.error('Error saving lesson:', error);
+      console.error('💥 Error saving lesson:', error);
+      
+      // ✅ User-friendly error messages
+      let errorMessage = 'Something went wrong. Please try again.';
+      
+      if (error.code === 'PGRST204') {
+        errorMessage = 'Database error. Please contact support.';
+      } else if (error.code === '23505') {
+        errorMessage = 'This lesson order already exists. Please choose a different number.';
+      } else if (error.message?.includes('teacher_id')) {
+        errorMessage = 'Unable to verify lesson ownership. Please try again.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -156,138 +222,239 @@ const MakeLessonForm: React.FC<MakeLessonFormProps> = ({
 
   return (
     <View style={styles.container}>
+      
+      {/* ✅ Simple Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>
-          {existingLesson ? 'Edit Lesson' : 'Create New Lesson'}
-        </Text>
+        <View style={styles.headerLeft}>
+          <View style={styles.iconContainer}>
+            <BookOpen size={24} color={colors.primary} />
+          </View>
+          <View>
+            <Text style={styles.title}>
+              {existingLesson ? 'Edit Lesson' : 'New Lesson'}
+            </Text>
+            <Text style={styles.subtitle}>
+              {existingLesson ? 'Update lesson content' : 'Create engaging content for your students'}
+            </Text>
+          </View>
+        </View>
         <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
-          <X size={24} color={colors.textPrimary} />
+          <X size={24} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
       
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         
-        {/* Lesson Title */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Lesson Title *</Text>
-          <TextInput
-            style={[styles.input, errors.title && styles.inputError]}
-            placeholder="Enter lesson title"
-            placeholderTextColor={colors.textSecondary}
-            value={formData.title}
-            onChangeText={(text) => setFormData({ ...formData, title: text })}
-            maxLength={100}
-          />
-          {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
+        {/* ✅ Lesson Order Badge */}
+        <View style={styles.orderBadgeContainer}>
+          <View style={styles.orderBadge}>
+            <Hash size={16} color={colors.primary} />
+            <Text style={styles.orderBadgeText}>Lesson {formData.lesson_order}</Text>
+          </View>
+          {!existingLesson && (
+            <Text style={styles.orderHint}>
+              Next available: {nextOrderNumber}
+            </Text>
+          )}
         </View>
-        
-        {/* Lesson Order */}
+
+        {/* ✅ Lesson Order Input */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Lesson Order *</Text>
-          <View style={styles.orderInputContainer}>
+          <Text style={styles.label}>Lesson Order</Text>
+          <View style={styles.orderContainer}>
             <TouchableOpacity
-              style={styles.orderButton}
+              style={[styles.orderButton, formData.lesson_order <= 1 && styles.orderButtonDisabled]}
               onPress={() => setFormData({ ...formData, lesson_order: Math.max(1, formData.lesson_order - 1) })}
               disabled={formData.lesson_order <= 1}
             >
-              <ChevronDown size={20} color={formData.lesson_order <= 1 ? colors.textTertiary : colors.textPrimary} />
+              <Text style={[styles.orderButtonText, formData.lesson_order <= 1 && styles.orderButtonTextDisabled]}>−</Text>
             </TouchableOpacity>
             
-            <TextInput
-              style={[styles.orderInput, errors.lesson_order && styles.inputError]}
-              value={formData.lesson_order.toString()}
-              onChangeText={(text) => {
-                const num = parseInt(text) || 1;
-                setFormData({ ...formData, lesson_order: Math.max(1, num) });
-              }}
-              keyboardType="numeric"
-              textAlign="center"
-            />
+            <View style={styles.orderInputContainer}>
+              <TextInput
+                style={styles.orderInput}
+                value={formData.lesson_order.toString()}
+                onChangeText={(text) => {
+                  const num = parseInt(text) || 1;
+                  setFormData({ ...formData, lesson_order: Math.max(1, num) });
+                }}
+                keyboardType="numeric"
+                textAlign="center"
+                selectTextOnFocus
+              />
+            </View>
             
             <TouchableOpacity
               style={styles.orderButton}
               onPress={() => setFormData({ ...formData, lesson_order: formData.lesson_order + 1 })}
             >
-              <ChevronUp size={20} color={colors.textPrimary} />
+              <Text style={styles.orderButtonText}>+</Text>
             </TouchableOpacity>
           </View>
           {errors.lesson_order && <Text style={styles.errorText}>{errors.lesson_order}</Text>}
         </View>
         
-        {/* Lesson Content */}
+        {/* ✅ Lesson Title */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Lesson Content *</Text>
+          <Text style={styles.label}>Lesson Title</Text>
           <TextInput
-            style={[styles.textArea, errors.content && styles.inputError]}
-            placeholder="Enter the lesson content here..."
-            placeholderTextColor={colors.textSecondary}
-            value={formData.content}
-            onChangeText={(text) => setFormData({ ...formData, content: text })}
-            multiline
-            numberOfLines={6}
+            style={[styles.input, errors.title && styles.inputError]}
+            placeholder="e.g., Introduction to React Native"
+            placeholderTextColor={colors.textTertiary}
+            value={formData.title}
+            onChangeText={(text) => setFormData({ ...formData, title: text })}
+            maxLength={100}
           />
+          {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
+          <Text style={styles.characterCount}>
+            {formData.title.length}/100 characters
+          </Text>
+        </View>
+        
+        {/* ✅ Lesson Content */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Lesson Content</Text>
+          <View style={styles.contentInputContainer}>
+            <FileText size={20} color={colors.textTertiary} style={styles.contentIcon} />
+            <TextInput
+              style={[styles.textArea, errors.content && styles.inputError]}
+              placeholder="Write your lesson content here...
+
+You can include:
+• Learning objectives
+• Step-by-step instructions  
+• Examples and explanations
+• Practice exercises"
+              placeholderTextColor={colors.textTertiary}
+              value={formData.content}
+              onChangeText={(text) => setFormData({ ...formData, content: text })}
+              multiline
+              numberOfLines={12}
+              textAlignVertical="top"
+            />
+          </View>
           {errors.content && <Text style={styles.errorText}>{errors.content}</Text>}
         </View>
+
+        {/* ✅ Bottom Spacing */}
+        <View style={styles.bottomSpacing} />
+        
       </ScrollView>
       
-      {/* Action Buttons */}
-      <View style={styles.buttonGroup}>
+      {/* ✅ Action Buttons */}
+      <View style={styles.actionContainer}>
         <TouchableOpacity
-          style={[styles.button, styles.submitButton]}
+          style={styles.cancelButton}
+          onPress={onCancel}
+          disabled={isLoading}
+        >
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
           onPress={handleSubmit}
           disabled={isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator color={colors.background} />
+            <ActivityIndicator size="small" color={colors.background} />
           ) : (
             <>
-              <Check size={20} color={colors.background} style={{ marginRight: 8 }} />
-              <Text style={styles.buttonText}>
-                {existingLesson ? 'Update Lesson' : 'Create Lesson'}
+              <Check size={18} color={colors.background} />
+              <Text style={styles.submitButtonText}>
+                {existingLesson ? 'Update' : 'Create'} Lesson
               </Text>
             </>
           )}
         </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.button, styles.cancelButton]}
-          onPress={onCancel}
-          disabled={isLoading}
-        >
-          <Text style={[styles.buttonText, { color: colors.textPrimary }]}>Cancel</Text>
-        </TouchableOpacity>
       </View>
+      
     </View>
   );
 };
 
+// ✅ Modern, clean styles
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
-  scrollContent: {
-    paddingBottom: 40,
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 20 : 16,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   title: {
-    fontSize: 22,
+    fontSize: 20,
     fontFamily: 'Inter-Bold',
     color: colors.textPrimary,
   },
+  subtitle: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   closeButton: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.backgroundSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  orderBadgeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 24,
+  },
+  orderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary + '15',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  orderBadgeText: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.primary,
+  },
+  orderHint: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: colors.textTertiary,
   },
   inputGroup: {
-    marginBottom: 20,
-    paddingHorizontal: 16,
+    marginBottom: 24,
   },
   label: {
     fontSize: 16,
@@ -299,8 +466,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     color: colors.textPrimary,
@@ -310,117 +478,122 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   errorText: {
     color: colors.error,
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: 'Inter-Medium',
-    marginTop: 4,
+    marginTop: 6,
   },
-  textArea: {
-    height: 150,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
+  characterCount: {
+    fontSize: 12,
     fontFamily: 'Inter-Regular',
-    color: colors.textPrimary,
-    textAlignVertical: 'top',
+    color: colors.textTertiary,
+    marginTop: 6,
+    textAlign: 'right',
   },
-  thumbnailContainer: {
-    position: 'relative',
-    width: '100%',
-    aspectRatio: 16/9,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: colors.backgroundSecondary,
-  },
-  thumbnailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  removeThumbnail: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: colors.error,
-    borderRadius: 12,
-    padding: 6,
-  },
-  uploadButton: {
+  orderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+  },
+  orderButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
-    height: '100%',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    backgroundColor: colors.backgroundSecondary,
-    gap: 8,
+    alignItems: 'center',
   },
-  uploadText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Medium',
-    color: colors.textSecondary,
+  orderButtonDisabled: {
+    backgroundColor: colors.textTertiary,
+    opacity: 0.5,
   },
-  pickerContainer: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 0,
-    height: 50,
+  orderButtonText: {
+    fontSize: 20,
+    fontFamily: 'Inter-Bold',
+    color: colors.background,
   },
-  picker: {
-    color: colors.textPrimary,
-    height: '100%',
-  },
-  pickerError: {
-    borderColor: colors.error,
+  orderButtonTextDisabled: {
+    color: colors.textTertiary,
   },
   orderInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flex: 1,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 50,
+    borderRadius: 16,
+    height: 44,
+    justifyContent: 'center',
   },
   orderInput: {
-    flex: 1,
     fontSize: 16,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Inter-SemiBold',
     color: colors.textPrimary,
     textAlign: 'center',
   },
-  orderButton: {
-    padding: 8,
+  contentInputContainer: {
+    position: 'relative',
   },
-  buttonGroup: {
-    paddingHorizontal: 16,
+  contentIcon: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    zIndex: 1,
+  },
+  textArea: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    paddingLeft: 48,
+    paddingRight: 16,
+    paddingTop: 16,
     paddingBottom: 16,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: colors.textPrimary,
+    minHeight: 200,
+  },
+  bottomSpacing: {
+    height: 40,
+  },
+  actionContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    paddingTop: 16,
+    backgroundColor: colors.card,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
     gap: 12,
   },
-  button: {
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  submitButton: {
-    backgroundColor: colors.primary,
-  },
   cancelButton: {
+    flex: 1,
+    height: 52,
+    borderRadius: 16,
     backgroundColor: colors.backgroundSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
   },
-  buttonText: {
+  cancelButtonText: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.textPrimary,
+  },
+  submitButton: {
+    flex: 2,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
+  submitButtonText: {
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
     color: colors.background,

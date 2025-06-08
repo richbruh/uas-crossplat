@@ -18,12 +18,23 @@ import { useAuth } from '@/app/context/AuthContext';
 import { supabase } from '@/app/utils/supabase';
 import { Course, Lesson, Enrollment } from '@/models';
 import { getLessonDuration, getLessonTypeIcon, getLessonTypeLabel } from '@/models/lesson';
-
+import MakeLessonForm from '@/components/MakeLessonForm';
 // ==================== INTERFACES ====================
 interface CourseWithTeacher extends Course {
   profiles?: {
     full_name?: string;
   };
+}
+
+// Update the LessonsSection interface
+interface LessonsSectionProps {
+  lessons: Lesson[];
+  enrollment: Enrollment | null;
+  isEnrolled: boolean;
+  isOwnCourse: boolean;
+  isLessonCompleted: (order: number) => boolean;
+  onLessonPress: (lessonId: string) => void;
+  onAddLesson?: () => void; // ✅ Add this prop
 }
 
 // ==================== MAIN COMPONENT ====================
@@ -42,7 +53,7 @@ export default function CourseDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const [showLessonForm, setShowLessonForm] = useState(false);
   // ==================== COMPUTED VALUES ====================
   const imageUri = course?.thumbnail_url;
   const isEnrolled = !!enrollment;
@@ -92,6 +103,7 @@ export default function CourseDetailScreen() {
       .eq('id', id)
       .single();
 
+      
     if (courseError) {
       console.error('❌ Course fetch error:', courseError);
       throw courseError;
@@ -110,11 +122,16 @@ export default function CourseDetailScreen() {
       .eq('course_id', id)
       .order('lesson_order', { ascending: true });
     
-    console.log('📚 Lessons Query Result:', {
-      courseId: id,
-      lessonsCount: lessonsData?.length || 0,
-      error: lessonsError
-    });
+  console.log('📚 LESSON DEBUG:', {
+    courseId: id,
+    totalLessonsFromDB: lessonsData?.length || 0,
+    lessons: lessonsData?.map(lesson => ({
+      id: lesson.id,
+      order: lesson.lesson_order,
+      title: lesson.title
+    })) || [],
+    error: lessonsError
+  });
 
     if (lessonsError) {
       console.error('❌ Lessons fetch error:', lessonsError);
@@ -125,7 +142,44 @@ export default function CourseDetailScreen() {
     setLessons(lessonsData || []);
     return lessonsData || [];
   };
+// Add this function after line 180
+const debugEnrollmentProgress = () => {
+  if (!enrollment || !lessons.length) return;
+  
+  console.log('🎯 ENROLLMENT PROGRESS DEBUG:', {
+    enrollmentId: enrollment.id,
+    completedLessons: enrollment.completed_lessons,
+    progressPercentage: enrollment.progress_percentage,
+    totalLessonsInState: lessons.length,
+    calculatedProgress: Math.round((enrollment.completed_lessons / lessons.length) * 100),
+    
+    lessonDetails: lessons.map((lesson, index) => ({
+      index: index + 1,
+      id: lesson.id,
+      order: lesson.lesson_order,
+      title: lesson.title,
+      isCompleted: isLessonCompleted(lesson.lesson_order),
+      isNext: lesson.lesson_order === enrollment.completed_lessons + 1
+    })),
+    
+    nextLesson: getNextIncompleteLesson()?.title || 'None',
+    
+    possibleIssues: {
+      lessonOrderGaps: lessons.some((lesson, index) => lesson.lesson_order !== index + 1),
+      duplicateOrders: lessons.length !== new Set(lessons.map(l => l.lesson_order)).size,
+    }
+  });
+};
 
+// Call this function in useEffect after fetchData
+useEffect(() => {
+  fetchData().then(() => {
+    // ✅ ADD DEBUG CALL
+    setTimeout(() => {
+      debugEnrollmentProgress();
+    }, 1000);
+  });
+}, [id, session]);
   const checkEnrollmentStatus = async (lessonsData: Lesson[]) => {
     console.log('🔍 Checking enrollment for user:', session?.user?.id);
 
@@ -162,12 +216,26 @@ export default function CourseDetailScreen() {
 
       const correctProgressPercentage = Math.round((enrollmentData.completed_lessons / totalLessons) * 100);
       
-      console.log('📊 Progress calculation:', {
-        completedLessons: enrollmentData.completed_lessons,
-        totalLessons,
-        currentProgress: enrollmentData.progress_percentage,
-        correctProgress: correctProgressPercentage
-      });
+    console.log('📊 PROGRESS CALCULATION DEBUG:', {
+      totalLessonsInArray: totalLessons,
+      completedLessons: enrollmentData.completed_lessons,
+      currentProgressFromDB: enrollmentData.progress_percentage,
+      calculatedProgress: correctProgressPercentage,
+      lessonOrders: lessonsData.map(l => l.lesson_order).sort((a, b) => a - b),
+      missingOrders: [],
+      duplicateOrders: []
+    });
+    const lessonOrders = lessonsData.map(l => l.lesson_order).sort((a, b) => a - b);
+    const expectedOrders = Array.from({length: totalLessons}, (_, i) => i + 1);
+    
+    console.log('🔍 LESSON ORDER ANALYSIS:', {
+      actualOrders: lessonOrders,
+      expectedOrders: expectedOrders,
+      hasGaps: !expectedOrders.every(order => lessonOrders.includes(order)),
+      hasDuplicates: lessonOrders.length !== new Set(lessonOrders).size,
+      maxOrder: Math.max(...lessonOrders),
+      minOrder: Math.min(...lessonOrders)
+    });
 
       // Update if there's a mismatch
       if (enrollmentData.progress_percentage !== correctProgressPercentage) {
@@ -274,6 +342,80 @@ export default function CourseDetailScreen() {
     }
   };
 
+  // ==================== LESSON FORM HANDLER ====================
+  const handleLessonSuccess = () => {
+    setShowLessonForm(false);
+    // Refresh data to show new lesson
+    fetchData();
+    Alert.alert('Success', 'Lesson created successfully!');
+  };
+
+  // Update LessonsSection component (around line 400)
+const LessonsSection: React.FC<LessonsSectionProps> = ({
+  lessons,
+  enrollment,
+  isEnrolled,
+  isOwnCourse,
+  isLessonCompleted,
+  onLessonPress,
+  onAddLesson // ✅ Add this prop
+}) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
+
+  return (
+    <View style={styles.lessonsContainer}>
+      <View style={styles.lessonsSectionHeader}>
+        <Text style={styles.lessonsTitle}>Course Content</Text>
+        
+        {/* ✅ ADD: Add Lesson Button for Course Owner */}
+        {isOwnCourse && onAddLesson && (
+          <TouchableOpacity 
+            style={styles.addLessonButton}
+            onPress={onAddLesson}
+          >
+            <Text style={styles.addLessonButtonText}>+ Add Lesson</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      
+      {lessons.length === 0 ? (
+        <View style={styles.emptyLessonsContainer}>
+          {isOwnCourse ? (
+            <>
+              <Text style={styles.emptyLessonsText}>No lessons created yet.</Text>
+              <Text style={styles.emptyLessonsSubtext}>
+                Click "Add Lesson" to create your first lesson.
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.emptyLessonsText}>No lessons available yet.</Text>
+              <Text style={styles.emptyLessonsSubtext}>
+                The instructor is still preparing the course materials.
+              </Text>
+            </>
+          )}
+        </View>
+      ) : (
+        <View style={styles.lessonsListContainer}>
+          {lessons.map((lesson, index) => (
+            <LessonItem
+              key={lesson.id}
+              lesson={lesson}
+              index={index}
+              enrollment={enrollment}
+              isAccessible={isEnrolled || isOwnCourse}
+              isCompleted={isLessonCompleted(lesson.lesson_order)}
+              isNext={enrollment ? lesson.lesson_order === enrollment.completed_lessons + 1 : false}
+              onPress={() => onLessonPress(lesson.id)}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
   // ==================== NAVIGATION ====================
   const goBack = () => {
     if (router.canGoBack()) {
@@ -374,11 +516,23 @@ export default function CourseDetailScreen() {
               isOwnCourse={isOwnCourse}
               isLessonCompleted={isLessonCompleted}
               onLessonPress={(lessonId) => router.push(`/lesson/${lessonId}`)}
+              onAddLesson={() => setShowLessonForm(true)} // ✅ Add this prop
             />
             
           </Animated.View>
         </SafeAreaView>
       </ScrollView>
+            {showLessonForm && isOwnCourse && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <MakeLessonForm
+              courseId={course!.id}
+              onSuccess={handleLessonSuccess}
+              onCancel={() => setShowLessonForm(false)}
+            />
+          </View>
+        </View>
+      )}
     </>
   );
 }
@@ -1090,4 +1244,41 @@ const getStyles = (colors: any) => StyleSheet.create({
   lockedText: {
     fontSize: 16,
   },
+   lessonsSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  addLessonButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addLessonButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: colors.background,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modalContainer: {
+    width: '95%',
+    height: '90%',
+    backgroundColor: colors.background,
+    borderRadius: 16,
+    overflow: 'hidden',
+  }
 });
