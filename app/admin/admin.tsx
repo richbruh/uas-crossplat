@@ -30,13 +30,9 @@ interface Profile {
 
 const Admin = () => {
   const { colors } = useTheme();
-  const { user } = useAuth();
+  const { session } = useAuth(); // ✅ Fixed: Use session
   const router = useRouter();
 
-  console.log('[Admin] Component mounted');
-  console.log('[Admin] Current user:', user);
-  console.log('[Admin] User role:', user?.role);
-  console.log('[Admin] User ID:', user?.id);
 
   // State management
   const [state, setState] = useState({
@@ -56,14 +52,14 @@ const Admin = () => {
 
   // Verify admin status on mount
     useEffect(() => {
-      console.log('[Admin] Checking user authentication...');
-    
-      if (user?.role !== 'admin') {
-        console.warn('[Admin] User role is not admin:', user?.role);
+      console.log('[Admin] Checking admin privileges...');
+
+      if (session?.user?.role !== 'admin') { // ✅ Fixed: Check role via session.user
+        console.warn('[Admin] User role is not admin:', session?.user?.role);
       } else {
         console.log('[Admin] User has admin access');
       }
-    }, [user]);
+    }, [session]); // ✅ Fixed: Depend on session
 
   // Fetch data with error boundaries
   const fetchData = useCallback(async (page = 1, refresh = false) => {
@@ -141,7 +137,7 @@ const Admin = () => {
 
   // Update user role
   const updateUserRole = async () => {
-    if (!state.selectedProfile || !user) {
+    if (!state.selectedProfile || !session?.user) { // ✅ Fixed: Use session.user
       console.warn('[Admin] No selected profile or user for role update');
       return;
     }
@@ -153,7 +149,7 @@ const Admin = () => {
       setState(prev => ({ ...prev, updatingRole: true }));
       
       // Prevent self-demotion
-      if (state.selectedProfile.user_id === user.id && state.newRole !== 'admin') {
+      if (state.selectedProfile.user_id === session.user.id && state.newRole !== 'admin') { // ✅ Fixed: Use session.user.id
         const errorMsg = 'You cannot remove your own admin privileges';
         console.error('[Admin] Self-demotion attempt:', errorMsg);
         throw new Error(errorMsg);
@@ -172,7 +168,7 @@ const Admin = () => {
       console.log('[Admin] Role updated successfully, creating audit log...');
       // Log the admin action
       const { error: auditError } = await supabase.from('admin_audit_log').insert({
-        admin_id: user.id,
+        admin_id: session.user.id, // ✅ Fixed: Use session.user.id
         action: 'role_update',
         target_user_id: state.selectedProfile.user_id,
         previous_value: state.selectedProfile.role,
