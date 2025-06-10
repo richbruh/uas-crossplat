@@ -17,3 +17,7 @@ Fitur fitur yang ada di aplikasi ini berupa :
 6. Halaman My Learning
 7. Halaman Profile
 8. Course Dashboard
+
+
+Link APK: 
+https://drive.google.com/drive/folders/1rQ0mdCOnsukeZt5J2XbPtm1TV9gpC50c?usp=sharing
